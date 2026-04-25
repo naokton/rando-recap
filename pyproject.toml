@@ -26,7 +26,11 @@ build-backend = "uv_build"
 dev = [
     "pytest>=8.0",
     "pytest-httpx>=0.30",
+    "ruff>=0.15.12",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110

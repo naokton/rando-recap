@@ -101,9 +101,7 @@ class StravaClient:
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html")
                 self.end_headers()
-                self.wfile.write(
-                    b"<h1>Authorized.</h1><p>You can close this tab.</p>"
-                )
+                self.wfile.write(b"<h1>Authorized.</h1><p>You can close this tab.</p>")
 
             def log_message(self, *_):  # silence
                 return
@@ -159,9 +157,7 @@ class StravaClient:
 
     def _auth_headers(self) -> dict[str, str]:
         if self._token is None:
-            raise RuntimeError(
-                "Not authenticated. Run `ride login` first."
-            )
+            raise RuntimeError("Not authenticated. Run `ride login` first.")
         if self._token.expired():
             self._refresh()
         return {"Authorization": f"Bearer {self._token.access_token}"}

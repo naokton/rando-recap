@@ -36,9 +36,7 @@ def detect_controls(
     min_stop_s: int,
 ) -> list[Control]:
     if len(time_s) != len(latlng):
-        raise ValueError(
-            f"time/latlng length mismatch: {len(time_s)} vs {len(latlng)}"
-        )
+        raise ValueError(f"time/latlng length mismatch: {len(time_s)} vs {len(latlng)}")
     controls: list[Control] = []
     for i in range(1, len(time_s)):
         gap = time_s[i] - time_s[i - 1]

@@ -34,9 +34,7 @@ class Cache:
         self._conn.commit()
 
     def get_activity(self, activity_id: int) -> dict[str, Any] | None:
-        row = self._conn.execute(
-            "SELECT json FROM activities WHERE id = ?", (activity_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT json FROM activities WHERE id = ?", (activity_id,)).fetchone()
         return json.loads(row[0]) if row else None
 
     def set_activity(self, activity_id: int, data: dict[str, Any]) -> None:
@@ -47,9 +45,7 @@ class Cache:
         self._conn.commit()
 
     def get_streams(self, activity_id: int) -> dict[str, Any] | None:
-        row = self._conn.execute(
-            "SELECT json FROM streams WHERE activity_id = ?", (activity_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT json FROM streams WHERE activity_id = ?", (activity_id,)).fetchone()
         return json.loads(row[0]) if row else None
 
     def set_streams(self, activity_id: int, data: dict[str, Any]) -> None:

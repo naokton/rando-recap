@@ -30,8 +30,10 @@ def _fmt_dur(seconds: int | float | None) -> str:
 def _make_clock_fmt(start_iso: str, utc_offset_s: int):
     start = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
     tz = timezone(timedelta(seconds=int(utc_offset_s)))
+
     def fmt(offset_s: int) -> str:
         return (start + timedelta(seconds=offset_s)).astimezone(tz).strftime("%H:%M")
+
     return fmt
 
 
@@ -94,9 +96,7 @@ def render_chart(
     # Stable lookup so zero-length segments (skipped by build_segments) become None slots.
     seg_by_label = {s.label: s for s in segments}
     stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
-    seg_labels = [
-        f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)
-    ]
+    seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
     ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
 
     # Cumulative distance progressing through the ride.
@@ -199,9 +199,7 @@ def render_chart_vertical(
     n = len(controls)
     seg_by_label = {s.label: s for s in segments}
     stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
-    seg_labels = [
-        f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)
-    ]
+    seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
     ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
 
     cum_km = [0.0]
@@ -226,10 +224,7 @@ def render_chart_vertical(
             rest_text = "0m"
         else:
             c = controls[i - 1]
-            time_info = (
-                f"{fmt_clock(c.time_before_s)}"
-                f" → {fmt_clock(c.time_after_s)}"
-            )
+            time_info = f"{fmt_clock(c.time_before_s)} → {fmt_clock(c.time_after_s)}"
             rest_text = f"{_fmt_dur(c.rest_s)}"
         stop_cells.append((label, f"{cum_km[i]:.1f} km", time_info, rest_text))
 
@@ -240,9 +235,7 @@ def render_chart_vertical(
         if s is None:
             seg_cells.append(SEG_EMPTY)
             continue
-        speed = (
-            f"{s.avg_speed_mps * 3.6:.1f} km/h" if s.avg_speed_mps else "-"
-        )
+        speed = f"{s.avg_speed_mps * 3.6:.1f} km/h" if s.avg_speed_mps else "-"
         seg_cells.append(
             (
                 f"{s.distance_m / 1000.0:.1f} km",
@@ -271,9 +264,7 @@ def render_chart_vertical(
 
     # Width of the stop-data block to the left of the track. Segment rows
     # are indented by this same amount so `│` aligns with the stop name.
-    left_block_width = (
-        stop_w[1] + len(sep) + stop_w[2] + len(sep) + stop_w[3] + len(sep)
-    )
+    left_block_width = stop_w[1] + len(sep) + stop_w[2] + len(sep) + stop_w[3] + len(sep)
     gutter = " " * left_block_width
 
     def _emit(s: str) -> None:
@@ -303,13 +294,7 @@ def render_chart_vertical(
 
     for i, _ in enumerate(stop_labels):
         label, dist, time_info, rest = stop_cells[i]
-        left = (
-            dist.rjust(stop_w[1])
-            + sep
-            + time_info.ljust(stop_w[2])
-            + sep
-            + rest.ljust(stop_w[3])
-        )
+        left = dist.rjust(stop_w[1]) + sep + time_info.ljust(stop_w[2]) + sep + rest.ljust(stop_w[3])
         _emit(left + sep + f"[bold]{label}[/bold]")
 
         if i < len(stop_labels) - 1:

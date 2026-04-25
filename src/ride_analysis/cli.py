@@ -26,8 +26,7 @@ def _client() -> StravaClient:
     client_secret = os.environ.get("STRAVA_CLIENT_SECRET")
     if not client_id or not client_secret:
         raise click.ClickException(
-            "STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET not set. "
-            "Copy .env.example to .env and fill them in."
+            "STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET not set. Copy .env.example to .env and fill them in."
         )
     cache = Cache(Path(user_cache_dir(APP_NAME)) / "cache.db")
     token_path = Path(user_config_dir(APP_NAME)) / "token.json"
@@ -102,9 +101,7 @@ def analyze(
         raise click.ClickException(str(e)) from e
 
     if "time" not in streams or "latlng" not in streams:
-        raise click.ClickException(
-            "Activity is missing 'time' or 'latlng' streams (no GPS?)."
-        )
+        raise click.ClickException("Activity is missing 'time' or 'latlng' streams (no GPS?).")
 
     controls = detect_controls(
         time_s=streams["time"]["data"],
