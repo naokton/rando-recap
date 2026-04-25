@@ -103,7 +103,7 @@ class StravaClient:
                 self.end_headers()
                 self.wfile.write(b"<h1>Authorized.</h1><p>You can close this tab.</p>")
 
-            def log_message(self, *_):  # silence
+            def log_message(self, format: str, *args: Any) -> None:  # silence
                 return
 
         server = HTTPServer(("localhost", port), Handler)

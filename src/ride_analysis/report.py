@@ -107,8 +107,9 @@ def render_chart(
     # End wall-clock time (= last sample's elapsed seconds from start).
     if controls:
         end_s = controls[-1].time_after_s
-        if ordered_segs[-1] is not None:
-            end_s += ordered_segs[-1].duration_s
+        last_seg = ordered_segs[-1]
+        if last_seg is not None:
+            end_s += last_seg.duration_s
     else:
         end_s = ordered_segs[0].duration_s if ordered_segs[0] else 0
 
@@ -146,7 +147,7 @@ def render_chart(
     _emit("")
     # Top block: stop content right-aligned (sits just above the track line).
     for row in range(top_h):
-        line = []
+        line: list[str] = []
         for ci, w in enumerate(col_widths):
             if ci % 2 == 0:
                 content = stop_blocks[ci // 2]
@@ -168,7 +169,7 @@ def render_chart(
 
     # Bottom block: segment content top-aligned.
     for row in range(bot_h):
-        line = []
+        line: list[str] = []
         for ci, w in enumerate(col_widths):
             if ci % 2 == 1:
                 content = seg_blocks[ci // 2]
@@ -208,8 +209,9 @@ def render_chart_vertical(
 
     if controls:
         end_s = controls[-1].time_after_s
-        if ordered_segs[-1] is not None:
-            end_s += ordered_segs[-1].duration_s
+        last_seg = ordered_segs[-1]
+        if last_seg is not None:
+            end_s += last_seg.duration_s
     else:
         end_s = ordered_segs[0].duration_s if ordered_segs[0] else 0
 
@@ -271,7 +273,7 @@ def render_chart_vertical(
         console.print(s, no_wrap=True, crop=False, overflow="ignore")
 
     def _fmt_seg(cells: tuple[str, ...], bold: bool = False) -> str:
-        parts = []
+        parts: list[str] = []
         for j, c in enumerate(cells):
             padded = c.rjust(seg_w[j])
             parts.append(f"[bold]{padded}[/bold]" if bold else padded)
