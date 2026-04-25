@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from rich.console import Console
@@ -27,9 +27,12 @@ def _fmt_dur(seconds: int | float | None) -> str:
     return f"{s}s"
 
 
-def _fmt_clock(start_iso: str, offset_s: int) -> str:
+def _make_clock_fmt(start_iso: str, utc_offset_s: int):
     start = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
-    return (start + timedelta(seconds=offset_s)).astimezone().strftime("%H:%M")
+    tz = timezone(timedelta(seconds=int(utc_offset_s)))
+    def fmt(offset_s: int) -> str:
+        return (start + timedelta(seconds=offset_s)).astimezone(tz).strftime("%H:%M")
+    return fmt
 
 
 def _fmt_kmh(mps: float | None) -> str:
@@ -85,6 +88,7 @@ def render_chart(
 ) -> None:
     """Horizontal stop/segment diagram. Stops above the track, segments below."""
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
+    fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     n = len(controls)
 
     # Stable lookup so zero-length segments (skipped by build_segments) become None slots.
@@ -111,13 +115,13 @@ def render_chart(
     stop_blocks: list[list[str]] = []
     for i, label in enumerate(stop_labels):
         if label == "Start":
-            arrive, depart, rest = None, _fmt_clock(start_iso, 0), 0
+            arrive, depart, rest = None, fmt_clock(0), 0
         elif label == "End":
-            arrive, depart, rest = _fmt_clock(start_iso, end_s), None, 0
+            arrive, depart, rest = fmt_clock(end_s), None, 0
         else:
             c = controls[i - 1]
-            arrive = _fmt_clock(start_iso, c.time_before_s)
-            depart = _fmt_clock(start_iso, c.time_after_s)
+            arrive = fmt_clock(c.time_before_s)
+            depart = fmt_clock(c.time_after_s)
             rest = c.rest_s
         stop_blocks.append(_stop_lines(label, cum_km[i], arrive, depart, rest))
 
@@ -191,6 +195,7 @@ def render_chart_vertical(
     so each metric reads cleanly down its own column.
     """
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
+    fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     n = len(controls)
     seg_by_label = {s.label: s for s in segments}
     stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
@@ -214,16 +219,16 @@ def render_chart_vertical(
     stop_cells: list[tuple[str, str, str, str]] = []
     for i, label in enumerate(stop_labels):
         if label == "Start":
-            time_info = _fmt_clock(start_iso, 0)
+            time_info = fmt_clock(0)
             rest_text = "0m"
         elif label == "End":
-            time_info = _fmt_clock(start_iso, end_s)
+            time_info = fmt_clock(end_s)
             rest_text = "0m"
         else:
             c = controls[i - 1]
             time_info = (
-                f"{_fmt_clock(start_iso, c.time_before_s)}"
-                f" → {_fmt_clock(start_iso, c.time_after_s)}"
+                f"{fmt_clock(c.time_before_s)}"
+                f" → {fmt_clock(c.time_after_s)}"
             )
             rest_text = f"{_fmt_dur(c.rest_s)}"
         stop_cells.append((label, f"{cum_km[i]:.1f} km", time_info, rest_text))
@@ -322,6 +327,7 @@ def render_terminal(
 ) -> None:
     console = Console()
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
+    fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     name = activity.get("name", "(unnamed ride)")
     elapsed = activity.get("elapsed_time", 0)
     moving = activity.get("moving_time", 0)
@@ -351,8 +357,8 @@ def render_terminal(
         for i, c in enumerate(controls, start=1):
             ct.add_row(
                 f"C{i}",
-                _fmt_clock(start_iso, c.time_before_s),
-                _fmt_clock(start_iso, c.time_after_s),
+                fmt_clock(c.time_before_s),
+                fmt_clock(c.time_after_s),
                 _fmt_dur(c.rest_s),
                 f"{c.lat:.5f},{c.lng:.5f}",
             )
