@@ -1,0 +1,32 @@
+[project]
+name = "ride-analysis"
+version = "0.1.0"
+description = "Randonneuring ride analysis from Strava activity streams"
+readme = "README.md"
+authors = [
+    { name = "naokton", email = "march.of.rabbits@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1",
+    "httpx>=0.27",
+    "platformdirs>=4.2",
+    "python-dotenv>=1.0",
+    "rich>=13.7",
+]
+
+[project.scripts]
+ride = "ride_analysis.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.10.10,<0.11.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-httpx>=0.30",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
