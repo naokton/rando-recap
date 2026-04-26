@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from rich import box
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
 if TYPE_CHECKING:
@@ -143,53 +144,75 @@ def render_chart(
     stop_widths = [max(len(line) for line in b) for b in stop_blocks]
     seg_widths = [max(len(line) for line in b) for b in seg_blocks]
 
-    # Interleave: stop, seg, stop, seg, ..., stop
-    col_widths: list[int] = []
-    for i in range(n + 1):
-        col_widths.append(stop_widths[i])
-        col_widths.append(seg_widths[i])
-    col_widths.append(stop_widths[-1])
-
     top_h = max(len(b) for b in stop_blocks)
     bot_h = max(len(b) for b in seg_blocks)
 
     def _emit(s: str) -> None:
         console.print(s, no_wrap=True, crop=False, overflow="ignore")
 
-    _emit("")
-    # Top block: stop content right-aligned (sits just above the track line).
-    for row in range(top_h):
-        line: list[str] = []
+    # Greedy chunk stops into rows that fit the terminal width. Each chunk spans
+    # stops [a..b] with segments [a..b-1] between them; the next chunk starts at
+    # stop b so the route reads continuously across wrapped rows.
+    target = console.width
+    chunks: list[tuple[int, int]] = []
+    a = 0
+    n_stops = n + 2
+    while a < n_stops - 1:
+        cur_w = stop_widths[a]
+        b = a
+        while b + 1 < n_stops:
+            new_w = cur_w + seg_widths[b] + stop_widths[b + 1]
+            if new_w > target and b > a:
+                break
+            cur_w = new_w
+            b += 1
+        chunks.append((a, b))
+        a = b
+
+    def _render_chunk(a: int, b: int) -> None:
+        # Interleave widths for this chunk: stop, seg, stop, ..., stop.
+        col_widths: list[int] = []
+        for i in range(a, b):
+            col_widths.append(stop_widths[i])
+            col_widths.append(seg_widths[i])
+        col_widths.append(stop_widths[b])
+
+        for row in range(top_h):
+            line: list[str] = []
+            for ci, w in enumerate(col_widths):
+                if ci % 2 == 0:
+                    content = stop_blocks[a + ci // 2]
+                    pad = top_h - len(content)
+                    text = content[row - pad] if row >= pad else ""
+                else:
+                    text = ""
+                line.append(text.center(w))
+            _emit("".join(line))
+
+        track_parts = []
         for ci, w in enumerate(col_widths):
             if ci % 2 == 0:
-                content = stop_blocks[ci // 2]
-                pad = top_h - len(content)
-                text = content[row - pad] if row >= pad else ""
+                track_parts.append("●".center(w, "─"))
             else:
-                text = ""
-            line.append(text.center(w))
-        _emit("".join(line))
+                track_parts.append("─" * w)
+        _emit("[bold]" + "".join(track_parts) + "[/bold]")
 
-    # Track line: ─ everywhere, ● centered in stop columns, connecting through segment columns.
-    track_parts = []
-    for ci, w in enumerate(col_widths):
-        if ci % 2 == 0:
-            track_parts.append("●".center(w, "─"))
-        else:
-            track_parts.append("─" * w)
-    _emit("[bold]" + "".join(track_parts) + "[/bold]")
+        for row in range(bot_h):
+            line = []
+            for ci, w in enumerate(col_widths):
+                if ci % 2 == 1:
+                    content = seg_blocks[a + ci // 2]
+                    text = content[row] if row < len(content) else ""
+                else:
+                    text = ""
+                line.append(text.center(w))
+            _emit("".join(line))
 
-    # Bottom block: segment content top-aligned.
-    for row in range(bot_h):
-        line: list[str] = []
-        for ci, w in enumerate(col_widths):
-            if ci % 2 == 1:
-                content = seg_blocks[ci // 2]
-                text = content[row] if row < len(content) else ""
-            else:
-                text = ""
-            line.append(text.center(w))
-        _emit("".join(line))
+    _emit("")
+    for ci, (a, b) in enumerate(chunks):
+        if ci > 0:
+            _emit("")
+        _render_chunk(a, b)
     _emit("")
 
 
@@ -299,7 +322,10 @@ def render_terminal(
     dist_km = activity.get("distance", 0) / 1000.0
     climb = activity.get("total_elevation_gain", 0)
 
-    console.rule(f"[bold]{name}[/bold]  ({start_iso[:10]})")
+    console.print(
+        Panel.fit(f"[bold green]{name}[/bold green]  ({start_iso[:10]})", style="green"),
+        justify="center",
+    )
     console.print(
         f"Distance: [bold]{dist_km:.1f} km[/bold]   "
         f"Elapsed: [bold]{_fmt_dur(elapsed)}[/bold]   "
