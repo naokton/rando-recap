@@ -31,9 +31,9 @@ def _fmt_dur(seconds: int | float | None) -> str:
     h, rem = divmod(seconds, 3600)
     m, s = divmod(rem, 60)
     if h:
-        return f"{h}h{m:02d}m"
+        return f"{h}h {m:02d}m"
     if m:
-        return f"{m}m{s:02d}s"
+        return f"{m}m {s:02d}s"
     return f"{s}s"
 
 
@@ -72,7 +72,7 @@ def _stop_lines(
     elif arrive:
         lines.append(arrive)
     if rest_s is not None:
-        lines.append("rest 0m" if rest_s == 0 else f"rest {_fmt_dur(rest_s)}")
+        lines.append("0m" if rest_s == 0 else f"{_fmt_dur(rest_s)}")
     return lines
 
 
