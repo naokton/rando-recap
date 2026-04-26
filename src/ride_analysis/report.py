@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
 from rich.table import Table
 
-from .segments import Segment
-from .stops import Control
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from .segments import Segment
+    from .stops import Control
 
 
 def _fmt_dur(seconds: int | float | None) -> str:
@@ -27,7 +30,7 @@ def _fmt_dur(seconds: int | float | None) -> str:
     return f"{s}s"
 
 
-def _make_clock_fmt(start_iso: str, utc_offset_s: int):
+def _make_clock_fmt(start_iso: str, utc_offset_s: int) -> Callable[[int], str]:
     start = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
     tz = timezone(timedelta(seconds=int(utc_offset_s)))
 

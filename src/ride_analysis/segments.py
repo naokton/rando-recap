@@ -8,8 +8,10 @@ no recording gaps, so elapsed time = moving time.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from .stops import Control
+if TYPE_CHECKING:
+    from .stops import Control
 
 
 @dataclass

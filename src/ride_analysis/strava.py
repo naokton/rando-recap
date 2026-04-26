@@ -12,13 +12,15 @@ import time
 import webbrowser
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 
-from .cache import Cache
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from .cache import Cache
 
 AUTHORIZE_URL = "https://www.strava.com/oauth/authorize"
 TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -42,7 +44,7 @@ class Token:
     expires_at: int
 
     @classmethod
-    def load(cls, path: Path) -> "Token | None":
+    def load(cls, path: Path) -> Token | None:
         if not path.exists():
             return None
         data = json.loads(path.read_text())
@@ -91,7 +93,7 @@ class StravaClient:
         code_holder: dict[str, str] = {}
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self):  # noqa: N802
+            def do_GET(self) -> None:
                 qs = parse_qs(urlparse(self.path).query)
                 if qs.get("state", [""])[0] != state:
                     self.send_response(400)
@@ -103,7 +105,7 @@ class StravaClient:
                 self.end_headers()
                 self.wfile.write(b"<h1>Authorized.</h1><p>You can close this tab.</p>")
 
-            def log_message(self, format: str, *args: Any) -> None:  # silence
+            def log_message(self, format: str, *args: object) -> None:  # silence
                 return
 
         server = HTTPServer(("localhost", port), Handler)
