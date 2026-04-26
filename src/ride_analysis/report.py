@@ -150,38 +150,44 @@ def render_chart(
     def _emit(s: str) -> None:
         console.print(s, no_wrap=True, crop=False, overflow="ignore")
 
-    # Greedy chunk stops into rows that fit the terminal width. Each chunk spans
-    # stops [a..b] with segments [a..b-1] between them; the next chunk starts at
-    # stop b so the route reads continuously across wrapped rows.
+    # Greedy pack columns into rows that fit the terminal width. The first row
+    # starts at stop 0; each subsequent row starts with the segment going out of
+    # the previous row's last stop (no stop duplication).
     target = console.width
-    chunks: list[tuple[int, int]] = []
-    a = 0
     n_stops = n + 2
-    while a < n_stops - 1:
-        cur_w = stop_widths[a]
-        b = a
-        while b + 1 < n_stops:
-            new_w = cur_w + seg_widths[b] + stop_widths[b + 1]
-            if new_w > target and b > a:
+    chunks: list[list[tuple[str, int]]] = []
+    start_stop = 0
+    while start_stop < n_stops:
+        if start_stop == 0:
+            tokens: list[tuple[str, int]] = [("stop", 0)]
+            cur_w = stop_widths[0]
+        else:
+            tokens = [("seg", start_stop - 1), ("stop", start_stop)]
+            cur_w = seg_widths[start_stop - 1] + stop_widths[start_stop]
+        last_stop = start_stop
+        while last_stop + 1 < n_stops:
+            added = seg_widths[last_stop] + stop_widths[last_stop + 1]
+            if cur_w + added > target and last_stop > start_stop:
                 break
-            cur_w = new_w
-            b += 1
-        chunks.append((a, b))
-        a = b
+            tokens.append(("seg", last_stop))
+            tokens.append(("stop", last_stop + 1))
+            cur_w += added
+            last_stop += 1
+        chunks.append(tokens)
+        if last_stop + 1 >= n_stops:
+            break
+        start_stop = last_stop + 1
 
-    def _render_chunk(a: int, b: int) -> None:
-        # Interleave widths for this chunk: stop, seg, stop, ..., stop.
-        col_widths: list[int] = []
-        for i in range(a, b):
-            col_widths.append(stop_widths[i])
-            col_widths.append(seg_widths[i])
-        col_widths.append(stop_widths[b])
+    def _render_chunk(tokens: list[tuple[str, int]]) -> None:
+        col_widths = [
+            stop_widths[idx] if kind == "stop" else seg_widths[idx] for kind, idx in tokens
+        ]
 
         for row in range(top_h):
             line: list[str] = []
-            for ci, w in enumerate(col_widths):
-                if ci % 2 == 0:
-                    content = stop_blocks[a + ci // 2]
+            for (kind, idx), w in zip(tokens, col_widths, strict=True):
+                if kind == "stop":
+                    content = stop_blocks[idx]
                     pad = top_h - len(content)
                     text = content[row - pad] if row >= pad else ""
                 else:
@@ -190,18 +196,15 @@ def render_chart(
             _emit("".join(line))
 
         track_parts = []
-        for ci, w in enumerate(col_widths):
-            if ci % 2 == 0:
-                track_parts.append("●".center(w, "─"))
-            else:
-                track_parts.append("─" * w)
+        for (kind, _), w in zip(tokens, col_widths, strict=True):
+            track_parts.append("●".center(w, "─") if kind == "stop" else "─" * w)
         _emit("[bold]" + "".join(track_parts) + "[/bold]")
 
         for row in range(bot_h):
             line = []
-            for ci, w in enumerate(col_widths):
-                if ci % 2 == 1:
-                    content = seg_blocks[a + ci // 2]
+            for (kind, idx), w in zip(tokens, col_widths, strict=True):
+                if kind == "seg":
+                    content = seg_blocks[idx]
                     text = content[row] if row < len(content) else ""
                 else:
                     text = ""
@@ -209,10 +212,10 @@ def render_chart(
             _emit("".join(line))
 
     _emit("")
-    for ci, (a, b) in enumerate(chunks):
+    for ci, tokens in enumerate(chunks):
         if ci > 0:
             _emit("")
-        _render_chunk(a, b)
+        _render_chunk(tokens)
     _emit("")
 
 
