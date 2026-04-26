@@ -336,19 +336,28 @@ def render_terminal(
         render_chart_vertical(console, activity, controls, segments)
 
     if controls:
+        n = len(controls)
+        seg_by_label = {s.label: s for s in segments}
+        stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
+        seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
+        ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
+        cum_km = [0.0]
+        for s in ordered_segs:
+            cum_km.append(cum_km[-1] + (s.distance_m / 1000.0 if s else 0.0))
+
         ct = Table(title=f"Controls (≥ stop threshold) — {len(controls)} detected")
         ct.add_column("#")
+        ct.add_column("Dist (km)", justify="right")
         ct.add_column("Arrive")
         ct.add_column("Depart")
         ct.add_column("Rest", justify="right")
-        ct.add_column("Lat,Lng")
         for i, c in enumerate(controls, start=1):
             ct.add_row(
                 f"C{i}",
+                f"{cum_km[i]:.1f}",
                 fmt_clock(c.time_before_s),
                 fmt_clock(c.time_after_s),
                 _fmt_dur(c.rest_s),
-                f"{c.lat:.5f},{c.lng:.5f}",
             )
         console.print(ct)
     else:
