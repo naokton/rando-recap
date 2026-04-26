@@ -69,13 +69,6 @@ def login() -> None:
 )
 @click.option("--refresh", is_flag=True, help="Bypass the cache and re-fetch.")
 @click.option(
-    "--layout",
-    type=click.Choice(["horizontal", "vertical", "both"]),
-    default="horizontal",
-    show_default=True,
-    help="Chart layout in the terminal report.",
-)
-@click.option(
     "--json",
     "json_out",
     is_flag=True,
@@ -85,7 +78,6 @@ def analyze(
     activity_id: int,
     min_stop: str,
     refresh: bool,
-    layout: str,
     json_out: bool,
 ) -> None:
     """Analyze one Strava activity and print per-control / per-segment stats."""
@@ -114,4 +106,4 @@ def analyze(
         sys.stdout.write(render_json(activity, controls, segments))
         sys.stdout.write("\n")
     else:
-        render_terminal(activity, controls, segments, layout=layout)
+        render_terminal(activity, controls, segments)

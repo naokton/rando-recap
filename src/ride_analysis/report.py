@@ -9,8 +9,13 @@ from typing import TYPE_CHECKING, Any
 
 from rich import box
 from rich.console import Console
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
+
+LEFT_PAD = 2
+_PAD = (0, 0, 0, LEFT_PAD)
+_PAD_PREFIX = " " * LEFT_PAD
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -148,12 +153,12 @@ def render_chart(
     bot_h = max(len(b) for b in seg_blocks)
 
     def _emit(s: str) -> None:
-        console.print(s, no_wrap=True, crop=False, overflow="ignore")
+        console.print(_PAD_PREFIX + s, no_wrap=True, crop=False, overflow="ignore")
 
     # Greedy pack columns into rows that fit the terminal width. The first row
     # starts at stop 0; each subsequent row starts with the segment going out of
     # the previous row's last stop (no stop duplication).
-    target = console.width
+    target = console.width - LEFT_PAD
     n_stops = n + 2
     chunks: list[list[tuple[str, int]]] = []
     start_stop = 0
@@ -219,102 +224,10 @@ def render_chart(
     _emit("")
 
 
-def render_chart_vertical(
-    console: Console,
-    activity: dict[str, Any],
-    controls: list[Control],
-    segments: list[Segment],
-) -> None:
-    """Vertical stop/segment diagram with per-metric column alignment.
-
-    Stop metrics (cumulative km, time info, rest) sit in fixed-width columns
-    to the left of the track. The stop name itself (Start, C1, …, End) acts
-    as the track marker; segment metrics appear next to the connecting `│`
-    on the rows in between. All metrics are placed in fixed-width columns
-    so each metric reads cleanly down its own column.
-    """
-    start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
-    fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
-    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
-    end_s = _end_seconds(controls, ordered_segs)
-
-    # Build all cell text first so we can size columns from the data.
-    stop_cells: list[tuple[str, str, str, str]] = []
-    for i, label in enumerate(stop_labels):
-        if label == "Start":
-            time_info = fmt_clock(0)
-            rest_text = "0m"
-        elif label == "End":
-            time_info = fmt_clock(end_s)
-            rest_text = "0m"
-        else:
-            c = controls[i - 1]
-            time_info = f"{fmt_clock(c.time_before_s)} → {fmt_clock(c.time_after_s)}"
-            rest_text = f"{_fmt_dur(c.rest_s)}"
-        stop_cells.append((label, f"{cum_km[i]:.1f} km", time_info, rest_text))
-
-    # Single-row segment metrics: dist, dur, speed, HR, cad, W, climb, m/km.
-    SEG_EMPTY = ("(no movement)", "", "", "", "", "", "", "")
-    seg_cells: list[tuple[str, ...]] = [SEG_EMPTY if s is None else _segment_cells(s) for s in ordered_segs]
-
-    # Stop column order on each line: dist, time_info, rest, then label.
-    # Cell tuple order: (label, dist, time_info, rest).
-    STOP_HEADERS = ("Stop", "Tot dist", "Stay", "")
-    SEG_HEADERS = ("Dist", "Dur", "Speed", "HR", "Cad", "Power", "Climb", "Cl. rate")
-
-    def _col_widths(rows: list[tuple], n_cols: int) -> list[int]:
-        return [max(len(r[j]) for r in rows) for j in range(n_cols)]
-
-    stop_w = _col_widths([STOP_HEADERS, *stop_cells], 4)
-    seg_w = _col_widths([SEG_HEADERS, *seg_cells], 8)
-
-    sep = "   "
-
-    # Width of the stop-data block to the left of the track. Segment rows
-    # are indented by this same amount so `│` aligns with the stop name.
-    left_block_width = stop_w[1] + len(sep) + stop_w[2] + len(sep) + stop_w[3] + len(sep)
-    gutter = " " * left_block_width
-
-    def _emit(s: str) -> None:
-        console.print(s, no_wrap=True, crop=False, overflow="ignore")
-
-    def _fmt_seg(cells: tuple[str, ...], bold: bool = False) -> str:
-        parts: list[str] = []
-        for j, c in enumerate(cells):
-            padded = c.rjust(seg_w[j])
-            parts.append(f"[bold]{padded}[/bold]" if bold else padded)
-        return sep.join(parts)
-
-    _emit("")
-    _emit(
-        f"[bold]{STOP_HEADERS[1].rjust(stop_w[1])}[/bold]"
-        + sep
-        + f"[bold]{STOP_HEADERS[2].ljust(stop_w[2])}[/bold]"
-        + sep
-        + f"[bold]{STOP_HEADERS[3].ljust(stop_w[3])}[/bold]"
-        + sep
-        + f"[bold]{STOP_HEADERS[0]}[/bold]"
-        + _fmt_seg(SEG_HEADERS, bold=True)
-    )
-    _emit("")
-
-    for i, _ in enumerate(stop_labels):
-        label, dist, time_info, rest = stop_cells[i]
-        left = dist.rjust(stop_w[1]) + sep + time_info.ljust(stop_w[2]) + sep + rest.ljust(stop_w[3])
-        _emit(left + sep + f"[bold]{label}[/bold]")
-
-        if i < len(stop_labels) - 1:
-            _emit(gutter + "│")
-            _emit(gutter + "│" + sep + _fmt_seg(seg_cells[i]))
-            _emit(gutter + "│")
-    _emit("")
-
-
 def render_terminal(
     activity: dict[str, Any],
     controls: list[Control],
     segments: list[Segment],
-    layout: str = "horizontal",
 ) -> None:
     console = Console()
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
@@ -326,20 +239,22 @@ def render_terminal(
     climb = activity.get("total_elevation_gain", 0)
 
     console.print(
-        Panel.fit(f"[bold green]{name}[/bold green]  ({start_iso[:10]})", style="green"),
-        justify="center",
+        Padding(
+            Panel.fit(f"[bold green]{name}[/bold green]  ({start_iso[:10]})", style="green"),
+            _PAD,
+        )
     )
     console.print(
-        f"Distance: [bold]{dist_km:.1f} km[/bold]   "
-        f"Elapsed: [bold]{_fmt_dur(elapsed)}[/bold]   "
-        f"Moving: [bold]{_fmt_dur(moving)}[/bold]   "
-        f"Climb: [bold]{climb:.0f} m[/bold]"
+        Padding(
+            f"Distance: [bold]{dist_km:.1f} km[/bold]   "
+            f"Elapsed: [bold]{_fmt_dur(elapsed)}[/bold]   "
+            f"Moving: [bold]{_fmt_dur(moving)}[/bold]   "
+            f"Climb: [bold]{climb:.0f} m[/bold]",
+            _PAD,
+        )
     )
 
-    if layout in ("horizontal", "both"):
-        render_chart(console, activity, controls, segments)
-    if layout in ("vertical", "both"):
-        render_chart_vertical(console, activity, controls, segments)
+    render_chart(console, activity, controls, segments)
 
     if controls:
         _, _, cum_km = _stops_segments_cumkm(controls, segments)
@@ -358,9 +273,9 @@ def render_terminal(
                 fmt_clock(c.time_after_s),
                 _fmt_dur(c.rest_s),
             )
-        console.print(ct)
+        console.print(Padding(ct, _PAD))
     else:
-        console.print("[dim]No stops above threshold detected.[/dim]")
+        console.print(Padding("[dim]No stops above threshold detected.[/dim]", _PAD))
 
     st = Table(title="Segments", box=box.HORIZONTALS)
     st.add_column("Segment")
@@ -384,7 +299,7 @@ def render_terminal(
             _fmt_num(s.climb_m, 0),
             _fmt_num(s.climb_m_per_km, 1),
         )
-    console.print(st)
+    console.print(Padding(st, _PAD))
 
 
 def render_json(
