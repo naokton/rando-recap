@@ -256,8 +256,8 @@ def render_chart_vertical(
 
     # Stop column order on each line: dist, time_info, rest, then label.
     # Cell tuple order: (label, dist, time_info, rest).
-    STOP_HEADERS = ("Stop", "Tot dist", "Time", "Rest")
-    SEG_HEADERS = ("Dist", "Dur", "Speed", "HR", "Cad", "Power", "Climb", "Climb rate")
+    STOP_HEADERS = ("Stop", "Tot dist", "Stay", "")
+    SEG_HEADERS = ("Dist", "Dur", "Speed", "HR", "Cad", "Power", "Climb", "Cl. rate")
 
     def _col_widths(rows: list[tuple], n_cols: int) -> list[int]:
         return [max(len(r[j]) for r in rows) for j in range(n_cols)]
@@ -283,8 +283,6 @@ def render_chart_vertical(
         return sep.join(parts)
 
     _emit("")
-    # Header rows: stop headers on the left + "Stop", then segment headers
-    # indented to align with segment data.
     _emit(
         f"[bold]{STOP_HEADERS[1].rjust(stop_w[1])}[/bold]"
         + sep
@@ -293,8 +291,8 @@ def render_chart_vertical(
         + f"[bold]{STOP_HEADERS[3].ljust(stop_w[3])}[/bold]"
         + sep
         + f"[bold]{STOP_HEADERS[0]}[/bold]"
+        + _fmt_seg(SEG_HEADERS, bold=True)
     )
-    _emit(gutter + " " + sep + _fmt_seg(SEG_HEADERS, bold=True))
     _emit("")
 
     for i, _ in enumerate(stop_labels):
