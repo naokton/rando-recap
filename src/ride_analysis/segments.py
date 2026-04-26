@@ -64,10 +64,10 @@ def build_segments(
     """Build ordered segments from streams keyed by type (Strava ``key_by_type=true``)."""
     time_s: list[int] = streams["time"]["data"]
     distance: list[float] = streams["distance"]["data"]
-    altitude = streams.get("altitude", {}).get("data") if "altitude" in streams else None
-    hr = streams.get("heartrate", {}).get("data") if "heartrate" in streams else None
-    cad = streams.get("cadence", {}).get("data") if "cadence" in streams else None
-    watts = streams.get("watts", {}).get("data") if "watts" in streams else None
+    altitude = streams.get("altitude", {}).get("data")
+    hr = streams.get("heartrate", {}).get("data")
+    cad = streams.get("cadence", {}).get("data")
+    watts = streams.get("watts", {}).get("data")
 
     n = len(time_s)
     if n == 0:

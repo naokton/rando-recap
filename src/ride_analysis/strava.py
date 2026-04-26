@@ -72,9 +72,6 @@ class StravaClient:
         self.cache = cache
         self._token: Token | None = Token.load(token_path)
 
-    def expired(self) -> bool:
-        return self._token is None or self._token.expired()
-
     # --- auth ----------------------------------------------------------------
 
     def login(self, port: int = 8721) -> None:
@@ -116,14 +113,13 @@ class StravaClient:
             raise RuntimeError("Strava OAuth callback did not return a code")
         self._exchange_code(code_holder["code"])
 
-    def _exchange_code(self, code: str) -> None:
+    def _post_token(self, grant: dict[str, str]) -> None:
         resp = httpx.post(
             TOKEN_URL,
             data={
                 "client_id": self.client_id,
                 "client_secret": self.client_secret,
-                "code": code,
-                "grant_type": "authorization_code",
+                **grant,
             },
             timeout=30,
         )
@@ -136,26 +132,14 @@ class StravaClient:
         )
         self._token.save(self.token_path)
 
+    def _exchange_code(self, code: str) -> None:
+        self._post_token({"grant_type": "authorization_code", "code": code})
+
     def _refresh(self) -> None:
         assert self._token is not None
-        resp = httpx.post(
-            TOKEN_URL,
-            data={
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "refresh_token": self._token.refresh_token,
-                "grant_type": "refresh_token",
-            },
-            timeout=30,
+        self._post_token(
+            {"grant_type": "refresh_token", "refresh_token": self._token.refresh_token}
         )
-        resp.raise_for_status()
-        body = resp.json()
-        self._token = Token(
-            access_token=body["access_token"],
-            refresh_token=body["refresh_token"],
-            expires_at=body["expires_at"],
-        )
-        self._token.save(self.token_path)
 
     def _auth_headers(self) -> dict[str, str]:
         if self._token is None:
