@@ -69,11 +69,9 @@ def _stop_lines(
     return lines
 
 
-def _segment_lines(s: Segment | None) -> list[str]:
-    if s is None:
-        return ["(no movement)"]
+def _segment_cells(s: Segment) -> tuple[str, str, str, str, str, str, str, str]:
     speed = f"{s.avg_speed_mps * 3.6:.1f} km/h" if s.avg_speed_mps else "-"
-    return [
+    return (
         f"{s.distance_m / 1000.0:.1f} km",
         _fmt_dur(s.duration_s),
         speed,
@@ -82,7 +80,20 @@ def _segment_lines(s: Segment | None) -> list[str]:
         f"{_fmt_num(s.avg_watts, 0)} W",
         f"{_fmt_num(s.climb_m, 0)} m↑",
         f"{_fmt_num(s.climb_m_per_km, 1)} ‰↑",
-    ]
+    )
+
+
+def _segment_lines(s: Segment | None) -> list[str]:
+    if s is None:
+        return ["(no movement)"]
+    return list(_segment_cells(s))
+
+
+def _end_seconds(controls: list[Control], ordered_segs: list[Segment | None]) -> int:
+    if controls:
+        last_seg = ordered_segs[-1]
+        return controls[-1].time_after_s + (last_seg.duration_s if last_seg else 0)
+    return ordered_segs[0].duration_s if ordered_segs[0] else 0
 
 
 def _stops_segments_cumkm(
@@ -111,15 +122,7 @@ def render_chart(
     fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     n = len(controls)
     stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
-
-    # End wall-clock time (= last sample's elapsed seconds from start).
-    if controls:
-        end_s = controls[-1].time_after_s
-        last_seg = ordered_segs[-1]
-        if last_seg is not None:
-            end_s += last_seg.duration_s
-    else:
-        end_s = ordered_segs[0].duration_s if ordered_segs[0] else 0
+    end_s = _end_seconds(controls, ordered_segs)
 
     stop_blocks: list[list[str]] = []
     for i, label in enumerate(stop_labels):
@@ -206,14 +209,7 @@ def render_chart_vertical(
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
     fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
-
-    if controls:
-        end_s = controls[-1].time_after_s
-        last_seg = ordered_segs[-1]
-        if last_seg is not None:
-            end_s += last_seg.duration_s
-    else:
-        end_s = ordered_segs[0].duration_s if ordered_segs[0] else 0
+    end_s = _end_seconds(controls, ordered_segs)
 
     # Build all cell text first so we can size columns from the data.
     stop_cells: list[tuple[str, str, str, str]] = []
@@ -232,24 +228,9 @@ def render_chart_vertical(
 
     # Single-row segment metrics: dist, dur, speed, HR, cad, W, climb, m/km.
     SEG_EMPTY = ("(no movement)", "", "", "", "", "", "", "")
-    seg_cells: list[tuple[str, ...]] = []
-    for s in ordered_segs:
-        if s is None:
-            seg_cells.append(SEG_EMPTY)
-            continue
-        speed = f"{s.avg_speed_mps * 3.6:.1f} km/h" if s.avg_speed_mps else "-"
-        seg_cells.append(
-            (
-                f"{s.distance_m / 1000.0:.1f} km",
-                _fmt_dur(s.duration_s),
-                speed,
-                f"{_fmt_num(s.avg_hr, 0)} bpm",
-                f"{_fmt_num(s.avg_cadence, 0)} rpm",
-                f"{_fmt_num(s.avg_watts, 0)} W",
-                f"{_fmt_num(s.climb_m, 0)} m↑",
-                f"{_fmt_num(s.climb_m_per_km, 1)} ‰↑",
-            )
-        )
+    seg_cells: list[tuple[str, ...]] = [
+        SEG_EMPTY if s is None else _segment_cells(s) for s in ordered_segs
+    ]
 
     # Stop column order on each line: dist, time_info, rest, then label.
     # Cell tuple order: (label, dist, time_info, rest).
