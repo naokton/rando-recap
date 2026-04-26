@@ -85,6 +85,21 @@ def _segment_lines(s: Segment | None) -> list[str]:
     ]
 
 
+def _stops_segments_cumkm(
+    controls: list[Control], segments: list[Segment]
+) -> tuple[list[str], list[Segment | None], list[float]]:
+    # Stable lookup so zero-length segments (skipped by build_segments) become None slots.
+    n = len(controls)
+    seg_by_label = {s.label: s for s in segments}
+    stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
+    seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
+    ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
+    cum_km = [0.0]
+    for s in ordered_segs:
+        cum_km.append(cum_km[-1] + (s.distance_m / 1000.0 if s else 0.0))
+    return stop_labels, ordered_segs, cum_km
+
+
 def render_chart(
     console: Console,
     activity: dict[str, Any],
@@ -95,17 +110,7 @@ def render_chart(
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
     fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     n = len(controls)
-
-    # Stable lookup so zero-length segments (skipped by build_segments) become None slots.
-    seg_by_label = {s.label: s for s in segments}
-    stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
-    seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
-    ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
-
-    # Cumulative distance progressing through the ride.
-    cum_km = [0.0]
-    for s in ordered_segs:
-        cum_km.append(cum_km[-1] + (s.distance_m / 1000.0 if s else 0.0))
+    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
 
     # End wall-clock time (= last sample's elapsed seconds from start).
     if controls:
@@ -200,15 +205,7 @@ def render_chart_vertical(
     """
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
     fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
-    n = len(controls)
-    seg_by_label = {s.label: s for s in segments}
-    stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
-    seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
-    ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
-
-    cum_km = [0.0]
-    for s in ordered_segs:
-        cum_km.append(cum_km[-1] + (s.distance_m / 1000.0 if s else 0.0))
+    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
 
     if controls:
         end_s = controls[-1].time_after_s
@@ -336,14 +333,7 @@ def render_terminal(
         render_chart_vertical(console, activity, controls, segments)
 
     if controls:
-        n = len(controls)
-        seg_by_label = {s.label: s for s in segments}
-        stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
-        seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
-        ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
-        cum_km = [0.0]
-        for s in ordered_segs:
-            cum_km.append(cum_km[-1] + (s.distance_m / 1000.0 if s else 0.0))
+        _, _, cum_km = _stops_segments_cumkm(controls, segments)
 
         ct = Table(title=f"Controls (≥ stop threshold) — {len(controls)} detected")
         ct.add_column("#")
