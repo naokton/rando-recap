@@ -102,7 +102,7 @@ class StravaClient:
                 self.end_headers()
                 self.wfile.write(b"<h1>Authorized.</h1><p>You can close this tab.</p>")
 
-            def log_message(self, format: str, *args: object) -> None:  # silence
+            def log_message(self, format: str, *args: object) -> None:
                 return
 
         server = HTTPServer(("localhost", port), Handler)
@@ -162,21 +162,36 @@ class StravaClient:
             )
         resp.raise_for_status()
 
-    def get_activity(self, activity_id: int, refresh: bool = False) -> dict[str, Any]:
+    def _cached_get(
+        self,
+        kind: str,
+        id_: int,
+        url: str,
+        params: dict[str, str],
+        timeout: float,
+        what: str,
+        refresh: bool,
+    ) -> dict[str, Any]:
         if not refresh:
-            cached = self.cache.get_activity(activity_id)
+            cached = self.cache.get(kind, id_)
             if cached is not None:
                 return cached
-        resp = httpx.get(
-            f"{API_BASE}/activities/{activity_id}",
-            headers=self._auth_headers(),
+        resp = httpx.get(url, headers=self._auth_headers(), params=params, timeout=timeout)
+        self._check(resp, what)
+        data = resp.json()
+        self.cache.set(kind, id_, data)
+        return data
+
+    def get_activity(self, activity_id: int, refresh: bool = False) -> dict[str, Any]:
+        return self._cached_get(
+            kind="activity",
+            id_=activity_id,
+            url=f"{API_BASE}/activities/{activity_id}",
             params={"include_all_efforts": "false"},
             timeout=30,
+            what=f"activity {activity_id}",
+            refresh=refresh,
         )
-        self._check(resp, f"activity {activity_id}")
-        data = resp.json()
-        self.cache.set_activity(activity_id, data)
-        return data
 
     def get_streams(
         self,
@@ -184,20 +199,15 @@ class StravaClient:
         types: tuple[str, ...] = DEFAULT_STREAM_TYPES,
         refresh: bool = False,
     ) -> dict[str, Any]:
-        if not refresh:
-            cached = self.cache.get_streams(activity_id)
-            if cached is not None:
-                return cached
-        resp = httpx.get(
-            f"{API_BASE}/activities/{activity_id}/streams",
-            headers=self._auth_headers(),
+        return self._cached_get(
+            kind="streams",
+            id_=activity_id,
+            url=f"{API_BASE}/activities/{activity_id}/streams",
             params={"keys": ",".join(types), "key_by_type": "true"},
             timeout=60,
+            what=f"streams for activity {activity_id}",
+            refresh=refresh,
         )
-        self._check(resp, f"streams for activity {activity_id}")
-        data = resp.json()
-        self.cache.set_streams(activity_id, data)
-        return data
 
 
 class StravaScopeError(RuntimeError):

@@ -38,7 +38,7 @@ def _fmt_dur(seconds: int | float | None) -> str:
 
 
 def _make_clock_fmt(start_iso: str, utc_offset_s: int) -> Callable[[int], str]:
-    start = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+    start = datetime.fromisoformat(start_iso)
     tz = timezone(timedelta(seconds=int(utc_offset_s)))
 
     def fmt(offset_s: int) -> str:
@@ -55,6 +55,10 @@ def _fmt_num(v: float | None, digits: int = 0) -> str:
     if v is None:
         return "-"
     return f"{v:.{digits}f}"
+
+
+def _fmt_unit(v: float | None, unit: str, digits: int = 0) -> str:
+    return "-" if v is None else f"{v:.{digits}f} {unit}"
 
 
 def _stop_lines(
@@ -77,16 +81,16 @@ def _stop_lines(
 
 
 def _segment_cells(s: Segment) -> tuple[str, str, str, str, str, str, str, str]:
-    speed = f"{s.avg_speed_mps * 3.6:.1f} km/h" if s.avg_speed_mps else "-"
+    kmh = s.avg_speed_mps * 3.6 if s.avg_speed_mps is not None else None
     return (
         f"{s.distance_m / 1000.0:.1f} km",
         _fmt_dur(s.duration_s),
-        speed,
-        f"{_fmt_num(s.avg_hr, 0)} bpm",
-        f"{_fmt_num(s.avg_cadence, 0)} rpm",
-        f"{_fmt_num(s.avg_watts, 0)} W",
-        f"{_fmt_num(s.climb_m, 0)} m↑",
-        f"{_fmt_num(s.climb_m_per_km, 1)} ‰↑",
+        _fmt_unit(kmh, "km/h", 1),
+        _fmt_unit(s.avg_hr, "bpm"),
+        _fmt_unit(s.avg_cadence, "rpm"),
+        _fmt_unit(s.avg_watts, "W"),
+        _fmt_unit(s.climb_m, "m↑"),
+        _fmt_unit(s.climb_m_per_km, "‰↑", 1),
     )
 
 
@@ -120,15 +124,14 @@ def _stops_segments_cumkm(
 
 def render_chart(
     console: Console,
-    activity: dict[str, Any],
+    fmt_clock: Callable[[int], str],
     controls: list[Control],
-    segments: list[Segment],
+    stop_labels: list[str],
+    ordered_segs: list[Segment | None],
+    cum_km: list[float],
 ) -> None:
     """Horizontal stop/segment diagram. Stops above the track, segments below."""
-    start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
-    fmt_clock = _make_clock_fmt(start_iso, activity.get("utc_offset", 0))
     n = len(controls)
-    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
     end_s = _end_seconds(controls, ordered_segs)
 
     stop_blocks: list[list[str]] = []
@@ -254,11 +257,10 @@ def render_terminal(
         )
     )
 
-    render_chart(console, activity, controls, segments)
+    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
+    render_chart(console, fmt_clock, controls, stop_labels, ordered_segs, cum_km)
 
     if controls:
-        _, _, cum_km = _stops_segments_cumkm(controls, segments)
-
         ct = Table(title="Controls", box=box.HORIZONTALS)
         ct.add_column("#")
         ct.add_column("Dist (km)", justify="right")
