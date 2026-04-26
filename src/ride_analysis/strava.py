@@ -137,9 +137,7 @@ class StravaClient:
 
     def _refresh(self) -> None:
         assert self._token is not None
-        self._post_token(
-            {"grant_type": "refresh_token", "refresh_token": self._token.refresh_token}
-        )
+        self._post_token({"grant_type": "refresh_token", "refresh_token": self._token.refresh_token})
 
     def _auth_headers(self) -> dict[str, str]:
         if self._token is None:

@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
@@ -228,9 +229,7 @@ def render_chart_vertical(
 
     # Single-row segment metrics: dist, dur, speed, HR, cad, W, climb, m/km.
     SEG_EMPTY = ("(no movement)", "", "", "", "", "", "", "")
-    seg_cells: list[tuple[str, ...]] = [
-        SEG_EMPTY if s is None else _segment_cells(s) for s in ordered_segs
-    ]
+    seg_cells: list[tuple[str, ...]] = [SEG_EMPTY if s is None else _segment_cells(s) for s in ordered_segs]
 
     # Stop column order on each line: dist, time_info, rest, then label.
     # Cell tuple order: (label, dist, time_info, rest).
@@ -316,7 +315,7 @@ def render_terminal(
     if controls:
         _, _, cum_km = _stops_segments_cumkm(controls, segments)
 
-        ct = Table(title=f"Controls (≥ stop threshold) — {len(controls)} detected")
+        ct = Table(title="Controls", box=box.HORIZONTALS)
         ct.add_column("#")
         ct.add_column("Dist (km)", justify="right")
         ct.add_column("Arrive")
@@ -334,7 +333,7 @@ def render_terminal(
     else:
         console.print("[dim]No stops above threshold detected.[/dim]")
 
-    st = Table(title="Segments")
+    st = Table(title="Segments", box=box.HORIZONTALS)
     st.add_column("Segment")
     st.add_column("Dist (km)", justify="right")
     st.add_column("Time", justify="right")
