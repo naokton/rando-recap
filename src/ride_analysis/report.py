@@ -187,9 +187,7 @@ def render_chart(
         start_stop = last_stop + 1
 
     def _render_chunk(tokens: list[tuple[str, int]]) -> None:
-        col_widths = [
-            stop_widths[idx] if kind == "stop" else seg_widths[idx] for kind, idx in tokens
-        ]
+        col_widths = [stop_widths[idx] if kind == "stop" else seg_widths[idx] for kind, idx in tokens]
 
         for row in range(top_h):
             line: list[str] = []

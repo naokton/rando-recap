@@ -10,6 +10,7 @@ import sqlite3
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 
@@ -31,9 +32,7 @@ class Cache:
         self._conn.commit()
 
     def get(self, kind: str, id_: int) -> dict[str, Any] | None:
-        row = self._conn.execute(
-            "SELECT json FROM blobs WHERE kind = ? AND id = ?", (kind, id_)
-        ).fetchone()
+        row = self._conn.execute("SELECT json FROM blobs WHERE kind = ? AND id = ?", (kind, id_)).fetchone()
         return json.loads(row[0]) if row else None
 
     def set(self, kind: str, id_: int, data: dict[str, Any]) -> None:
@@ -42,3 +41,8 @@ class Cache:
             (kind, id_, json.dumps(data)),
         )
         self._conn.commit()
+
+    def iter_kind(self, kind: str) -> Iterator[tuple[int, dict[str, Any]]]:
+        """Yield (id, parsed_json) for every blob of the given kind."""
+        for row in self._conn.execute("SELECT id, json FROM blobs WHERE kind = ?", (kind,)):
+            yield row[0], json.loads(row[1])

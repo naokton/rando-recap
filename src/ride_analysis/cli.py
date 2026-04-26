@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 import re
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import click
 from dotenv import load_dotenv
@@ -15,7 +17,7 @@ from .cache import Cache
 from .report import render_json, render_terminal
 from .segments import build_segments
 from .stops import detect_controls
-from .strava import StravaClient, StravaScopeError
+from .strava import StravaClient, StravaRateLimitError, StravaScopeError
 
 APP_NAME = "ride-analysis"
 
@@ -44,6 +46,49 @@ def _parse_duration(value: str) -> int:
     n = int(m.group(1))
     unit = (m.group(2) or "m").lower()
     return n * {"s": 1, "m": 60, "h": 3600}[unit]
+
+
+_SINCE_RE = re.compile(r"^(\d+)\s*([dwmy])$", re.IGNORECASE)
+_SINCE_DAYS = {"d": 1, "w": 7, "m": 30, "y": 365}
+
+
+def _parse_since(value: str) -> int | None:
+    """Parse '1m' / '6m' / '1y' / 'all' / 'YYYY-MM-DD' → epoch seconds (or None for 'all').
+
+    The unit letters here (d/w/m/y) are days/weeks/months/years — distinct from
+    `_parse_duration` where 'm' means minutes.
+    """
+    raw = value.strip()
+    if raw.lower() == "all":
+        return None
+    m = _SINCE_RE.match(raw)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2).lower()
+        delta = timedelta(days=n * _SINCE_DAYS[unit])
+        return int((datetime.now() - delta).timestamp())
+    try:
+        return int(datetime.strptime(raw, "%Y-%m-%d").timestamp())
+    except ValueError as e:
+        raise click.BadParameter(
+            f"unrecognized --since value: {value!r}. Use Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD."
+        ) from e
+
+
+def _is_randonneuring(
+    summary: dict[str, Any],
+    allowed_types: set[str],
+    min_distance_m: float,
+) -> bool:
+    """Filter Strava summary activities down to randonneuring rides.
+
+    Uses ``sport_type`` (newer field) and falls back to ``type`` for older
+    activities that pre-date the sport_type split.
+    """
+    sport = summary.get("sport_type") or summary.get("type")
+    if sport not in allowed_types:
+        return False
+    return float(summary.get("distance") or 0) >= min_distance_m
 
 
 @click.group()
@@ -107,3 +152,89 @@ def analyze(
         sys.stdout.write("\n")
     else:
         render_terminal(activity, controls, segments)
+
+
+@main.command()
+@click.option(
+    "--since",
+    default="1m",
+    show_default=True,
+    help="Window: Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD.",
+)
+@click.option(
+    "--min-distance",
+    "min_distance_km",
+    type=float,
+    default=190.0,
+    show_default=True,
+    help="Minimum ride distance in km.",
+)
+@click.option(
+    "--types",
+    "sport_types",
+    default="Ride,GravelRide",
+    show_default=True,
+    help="Comma-separated Strava sport_type values to include.",
+)
+@click.option("--refresh", is_flag=True, help="Re-fetch detail even if already cached.")
+def fetch(
+    since: str,
+    min_distance_km: float,
+    sport_types: str,
+    refresh: bool,
+) -> None:
+    """Cache randonneuring activity details from your Strava history."""
+    client = _client()
+    if not client.authenticated:
+        raise click.ClickException("Not authenticated. Run `ride login` first.")
+
+    after = _parse_since(since)
+    min_distance_m = min_distance_km * 1000
+    allowed = {s.strip() for s in sport_types.split(",") if s.strip()}
+    if not allowed:
+        raise click.BadParameter("--types must list at least one sport_type")
+
+    seen = matched = skipped_cached = added = skipped_filter = 0
+    try:
+        for summary in client.list_athlete_activities(after=after):
+            seen += 1
+            if not _is_randonneuring(summary, allowed, min_distance_m):
+                skipped_filter += 1
+                continue
+            matched += 1
+            sid = int(summary["id"])
+            date = (summary.get("start_date_local") or summary.get("start_date") or "")[:10]
+            distance_km = float(summary.get("distance") or 0) / 1000
+            label = f"{date}  {distance_km:6.1f} km  {summary.get('name', '')}"
+            if not refresh and client.cache.get("activity", sid) is not None:
+                skipped_cached += 1
+                click.echo(f"  cached  {label}")
+                continue
+            click.echo(f"  add     {label}")
+            client.cache.set("activity", sid, summary)
+            added += 1
+    except StravaScopeError as e:
+        raise click.ClickException(str(e)) from e
+    except StravaRateLimitError as e:
+        raise click.ClickException(str(e)) from e
+
+    click.echo(
+        f"\nDone. seen={seen}  matched={matched}  added={added}  "
+        f"skipped(cached)={skipped_cached}  skipped(filter)={skipped_filter}"
+    )
+
+
+@main.command(name="list")
+def list_rides() -> None:
+    """List rides currently in the local cache (id, date, distance, name)."""
+    cache = _client().cache
+    rows: list[tuple[str, int, float, str]] = []
+    for sid, activity in cache.iter_kind("activity"):
+        date = (activity.get("start_date_local") or activity.get("start_date") or "")[:10]
+        distance_km = float(activity.get("distance") or 0) / 1000
+        name = activity.get("name", "")
+        rows.append((date, sid, distance_km, name))
+    rows.sort(key=lambda r: r[0], reverse=True)
+    for date, sid, distance_km, name in rows:
+        click.echo(f"{sid:>12}  {date}  {distance_km:6.1f} km  {name}")
+    click.echo(f"\n{len(rows)} cached.")

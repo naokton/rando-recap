@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import json
 import secrets
+import sys
 import time
 import webbrowser
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -18,6 +20,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import httpx
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     from .cache import Cache
@@ -162,6 +165,53 @@ class StravaClient:
             )
         resp.raise_for_status()
 
+    def _maybe_throttle(self, resp: httpx.Response) -> None:
+        """Sleep until the next 15-min window if we're near the short-window cap."""
+        usage = _parse_rate_pair(resp.headers.get("X-RateLimit-Usage"))
+        limits = _parse_rate_pair(resp.headers.get("X-RateLimit-Limit"))
+        if usage is None or limits is None:
+            return
+        short_usage, _ = usage
+        short_limit, _ = limits
+        if short_limit > 0 and short_usage / short_limit >= 0.9:
+            wait = _seconds_to_next_quarter()
+            print(
+                f"Strava rate limit approaching ({short_usage}/{short_limit}); sleeping {wait}s.",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
+
+    def _get(
+        self,
+        url: str,
+        params: dict[str, Any],
+        timeout: float,
+        what: str,
+    ) -> httpx.Response:
+        """Authenticated GET with one 429 retry; bails on daily-limit exhaustion."""
+        for attempt in range(2):
+            resp = httpx.get(url, headers=self._auth_headers(), params=params, timeout=timeout)
+            if resp.status_code != 429:
+                self._check(resp, what)
+                self._maybe_throttle(resp)
+                return resp
+            usage = _parse_rate_pair(resp.headers.get("X-RateLimit-Usage"))
+            limits = _parse_rate_pair(resp.headers.get("X-RateLimit-Limit"))
+            if usage is not None and limits is not None and usage[1] >= limits[1]:
+                raise StravaRateLimitError(
+                    f"Strava daily read limit hit ({usage[1]}/{limits[1]}); resume tomorrow."
+                )
+            if attempt == 1:
+                resp.raise_for_status()
+            retry_after = resp.headers.get("Retry-After")
+            wait = int(retry_after) if retry_after else _seconds_to_next_quarter()
+            print(
+                f"Strava returned 429 for {what}; sleeping {wait}s and retrying once.",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
+        raise RuntimeError("unreachable")
+
     def _cached_get(
         self,
         kind: str,
@@ -176,8 +226,7 @@ class StravaClient:
             cached = self.cache.get(kind, id_)
             if cached is not None:
                 return cached
-        resp = httpx.get(url, headers=self._auth_headers(), params=params, timeout=timeout)
-        self._check(resp, what)
+        resp = self._get(url, params, timeout, what)
         data = resp.json()
         self.cache.set(kind, id_, data)
         return data
@@ -209,6 +258,63 @@ class StravaClient:
             refresh=refresh,
         )
 
+    def list_athlete_activities(
+        self,
+        after: int | None = None,
+        before: int | None = None,
+        per_page: int = 200,
+    ) -> Iterator[dict[str, Any]]:
+        """Yield summary activities from /athlete/activities, paginated.
+
+        ``after`` / ``before`` are epoch seconds. List pages are not cached
+        (the list grows as new activities are uploaded).
+        """
+        page = 1
+        while True:
+            params: dict[str, Any] = {"page": page, "per_page": per_page}
+            if after is not None:
+                params["after"] = after
+            if before is not None:
+                params["before"] = before
+            resp = self._get(
+                url=f"{API_BASE}/athlete/activities",
+                params=params,
+                timeout=30,
+                what=f"athlete activities page {page}",
+            )
+            items = resp.json()
+            if not items:
+                return
+            yield from items
+            if len(items) < per_page:
+                return
+            page += 1
+
 
 class StravaScopeError(RuntimeError):
     pass
+
+
+class StravaRateLimitError(RuntimeError):
+    """Raised when Strava's daily read budget is exhausted."""
+
+
+def _parse_rate_pair(header: str | None) -> tuple[int, int] | None:
+    """Parse Strava's 'short,daily' rate-limit header, e.g. '12,257'."""
+    if not header:
+        return None
+    parts = header.split(",")
+    if len(parts) != 2:
+        return None
+    try:
+        return int(parts[0]), int(parts[1])
+    except ValueError:
+        return None
+
+
+def _seconds_to_next_quarter() -> int:
+    """Seconds until the next 15-minute UTC boundary (Strava's window)."""
+    now = datetime.now(UTC)
+    minutes_into = now.minute % 15
+    seconds = (15 - minutes_into) * 60 - now.second
+    return max(seconds, 1)

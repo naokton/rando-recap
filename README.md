@@ -32,6 +32,31 @@ uv run ride analyze <activity_id> --refresh        # bypass local cache
 
 `<activity_id>` is the integer at the end of a Strava activity URL.
 
+### Bulk-cache rides
+
+`ride fetch` walks your Strava history, filters down to randonneuring rides
+(by `sport_type` and minimum distance), and stashes each match's summary
+metadata locally. Only the listing endpoint is hit (~1 call per 200
+activities, no per-ride detail call) — the summary already carries every
+field `analyze` needs. Streams are still fetched on demand by `analyze`.
+
+```bash
+uv run ride fetch                          # last month, ≥190 km, Ride/GravelRide
+uv run ride fetch --since all              # first-time full sync
+uv run ride fetch --since 6m --min-distance 200
+```
+
+`--since` accepts `Nd` / `Nw` / `Nm` / `Ny` (days/weeks/months/years), `all`,
+or a `YYYY-MM-DD` date. The command is idempotent — already-cached rides are
+skipped — and respects Strava's rate limits (sleeps near the 100-req /
+15-minute cap, retries once on 429, aborts on daily-limit exhaustion).
+
+To see which rides are in the cache (and grab an id for `analyze`):
+
+```bash
+uv run ride list
+```
+
 The terminal report shows:
 
 - **Controls** — clock time arriving / departing / dwell, with lat,lng.
