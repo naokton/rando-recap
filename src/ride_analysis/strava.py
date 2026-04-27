@@ -212,51 +212,25 @@ class StravaClient:
             time.sleep(wait)
         raise RuntimeError("unreachable")
 
-    def _cached_get(
-        self,
-        kind: str,
-        id_: int,
-        url: str,
-        params: dict[str, str],
-        timeout: float,
-        what: str,
-        refresh: bool,
-    ) -> dict[str, Any]:
-        if not refresh:
-            cached = self.cache.get(kind, id_)
-            if cached is not None:
-                return cached
-        resp = self._get(url, params, timeout, what)
-        data = resp.json()
-        self.cache.set(kind, id_, data)
-        return data
-
-    def get_activity(self, activity_id: int, refresh: bool = False) -> dict[str, Any]:
-        return self._cached_get(
-            kind="activity",
-            id_=activity_id,
-            url=f"{API_BASE}/activities/{activity_id}",
-            params={"include_all_efforts": "false"},
-            timeout=30,
-            what=f"activity {activity_id}",
-            refresh=refresh,
-        )
-
     def get_streams(
         self,
         activity_id: int,
         types: tuple[str, ...] = DEFAULT_STREAM_TYPES,
         refresh: bool = False,
     ) -> dict[str, Any]:
-        return self._cached_get(
-            kind="streams",
-            id_=activity_id,
+        if not refresh:
+            cached = self.cache.get("streams", activity_id)
+            if cached is not None:
+                return cached
+        resp = self._get(
             url=f"{API_BASE}/activities/{activity_id}/streams",
             params={"keys": ",".join(types), "key_by_type": "true"},
             timeout=60,
             what=f"streams for activity {activity_id}",
-            refresh=refresh,
         )
+        data = resp.json()
+        self.cache.set("streams", activity_id, data)
+        return data
 
     def list_athlete_activities(
         self,

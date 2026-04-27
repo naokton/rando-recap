@@ -133,7 +133,7 @@ def login() -> None:
     show_default=True,
     help="Stops at least this long are treated as controls. e.g. 5m, 300s, 1h.",
 )
-@click.option("--refresh", is_flag=True, help="Bypass the cache and re-fetch.")
+@click.option("--refresh", is_flag=True, help="Re-fetch streams even if cached.")
 @click.option(
     "--json",
     "json_out",
@@ -146,14 +146,18 @@ def analyze(
     refresh: bool,
     json_out: bool,
 ) -> None:
-    """Analyze one Strava activity and print per-control / per-segment stats."""
+    """Analyze one cached activity and print per-control / per-segment stats."""
     client = _client()
     if not client.authenticated:
         raise click.ClickException("Not authenticated. Run `ride login` first.")
+    activity = client.cache.get("summary", activity_id)
+    if activity is None:
+        raise click.ClickException(
+            f"Activity {activity_id} not in cache. Run `ride fetch` first."
+        )
     min_stop_s = _parse_duration(min_stop)
 
     try:
-        activity = client.get_activity(activity_id, refresh=refresh)
         streams = client.get_streams(activity_id, refresh=refresh)
     except StravaScopeError as e:
         raise click.ClickException(str(e)) from e
