@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import click
 import pytest
 
-from ride_analysis.cli import _is_randonneuring, _parse_since
+from ride_analysis.cli import _matches_filter, _parse_since
 
 
 def test_parse_since_all_returns_none():
@@ -33,27 +33,27 @@ def test_parse_since_invalid_raises():
         _parse_since("5x")
 
 
-def test_is_randonneuring_passes_when_above_threshold():
+def test_matches_filter_passes_when_above_threshold():
     s = {"sport_type": "Ride", "distance": 200_000}
-    assert _is_randonneuring(s, {"Ride", "GravelRide"}, 190_000)
+    assert _matches_filter(s, {"Ride", "GravelRide"}, 190_000)
 
 
-def test_is_randonneuring_rejects_short_distance():
+def test_matches_filter_rejects_short_distance():
     s = {"sport_type": "Ride", "distance": 50_000}
-    assert not _is_randonneuring(s, {"Ride", "GravelRide"}, 190_000)
+    assert not _matches_filter(s, {"Ride", "GravelRide"}, 190_000)
 
 
-def test_is_randonneuring_rejects_other_sport():
+def test_matches_filter_rejects_other_sport():
     s = {"sport_type": "Run", "distance": 200_000}
-    assert not _is_randonneuring(s, {"Ride", "GravelRide"}, 190_000)
+    assert not _matches_filter(s, {"Ride", "GravelRide"}, 190_000)
 
 
-def test_is_randonneuring_falls_back_to_type():
+def test_matches_filter_falls_back_to_type():
     # Older activities only carry `type`, not `sport_type`.
     s = {"type": "Ride", "distance": 200_000}
-    assert _is_randonneuring(s, {"Ride"}, 190_000)
+    assert _matches_filter(s, {"Ride"}, 190_000)
 
 
-def test_is_randonneuring_handles_missing_distance():
+def test_matches_filter_handles_missing_distance():
     s = {"sport_type": "Ride"}
-    assert not _is_randonneuring(s, {"Ride"}, 190_000)
+    assert not _matches_filter(s, {"Ride"}, 190_000)

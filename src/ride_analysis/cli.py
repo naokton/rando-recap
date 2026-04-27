@@ -96,20 +96,20 @@ def _parse_since(value: str) -> int | None:
         ) from e
 
 
-def _is_randonneuring(
-    summary: dict[str, Any],
+def _matches_filter(
+    activity: dict[str, Any],
     allowed_types: set[str],
     min_distance_m: float,
 ) -> bool:
-    """Filter Strava summary activities down to randonneuring rides.
+    """Local filter for randonneuring-style rides.
 
     Uses ``sport_type`` (newer field) and falls back to ``type`` for older
     activities that pre-date the sport_type split.
     """
-    sport = summary.get("sport_type") or summary.get("type")
+    sport = activity.get("sport_type") or activity.get("type")
     if sport not in allowed_types:
         return False
-    return float(summary.get("distance") or 0) >= min_distance_m
+    return float(activity.get("distance") or 0) >= min_distance_m
 
 
 @click.group()
@@ -182,13 +182,42 @@ def analyze(
     show_default=True,
     help="Window: Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD.",
 )
+@click.option("--refresh", is_flag=True, help="Overwrite cached summaries even if already present.")
+def fetch(since: str, refresh: bool) -> None:
+    """Cache every activity summary in --since window. Filtering happens at list time."""
+    client = _client()
+    if not client.authenticated:
+        raise click.ClickException("Not authenticated. Run `ride login` first.")
+
+    after = _parse_since(since)
+    seen = added = skipped_cached = 0
+    try:
+        for activity in client.list_athlete_activities(after=after):
+            seen += 1
+            sid = int(activity["id"])
+            summary = Summary.from_activity(activity)
+            label = f"{summary.date}  {summary.distance_km:6.1f} km  {summary.name}"
+            if not refresh and client.cache.has("summary", sid):
+                skipped_cached += 1
+                click.echo(f"  cached  {label}")
+                continue
+            click.echo(f"  add     {label}")
+            client.cache.set("summary", sid, activity)
+            added += 1
+    except (StravaScopeError, StravaRateLimitError) as e:
+        raise click.ClickException(str(e)) from e
+
+    click.echo(f"\nDone. seen={seen}  added={added}  skipped(cached)={skipped_cached}")
+
+
+@main.command(name="list")
 @click.option(
     "--min-distance",
     "min_distance_km",
     type=float,
     default=190.0,
     show_default=True,
-    help="Minimum ride distance in km.",
+    help="Minimum ride distance in km. Use 0 to disable.",
 )
 @click.option(
     "--types",
@@ -197,56 +226,21 @@ def analyze(
     show_default=True,
     help="Comma-separated Strava sport_type values to include.",
 )
-@click.option("--refresh", is_flag=True, help="Re-fetch detail even if already cached.")
-def fetch(
-    since: str,
-    min_distance_km: float,
-    sport_types: str,
-    refresh: bool,
-) -> None:
-    """Cache randonneuring activity details from your Strava history."""
-    client = _client()
-    if not client.authenticated:
-        raise click.ClickException("Not authenticated. Run `ride login` first.")
-
-    after = _parse_since(since)
-    min_distance_m = min_distance_km * 1000
+def list_rides(min_distance_km: float, sport_types: str) -> None:
+    """List cached rides, filtered locally by distance and sport_type."""
     allowed = {s.strip() for s in sport_types.split(",") if s.strip()}
     if not allowed:
         raise click.BadParameter("--types must list at least one sport_type")
+    min_distance_m = min_distance_km * 1000
 
-    seen = matched = skipped_cached = added = skipped_filter = 0
-    try:
-        for activity in client.list_athlete_activities(after=after):
-            seen += 1
-            if not _is_randonneuring(activity, allowed, min_distance_m):
-                skipped_filter += 1
-                continue
-            matched += 1
-            sid = int(activity["id"])
-            summary = Summary.from_activity(activity)
-            label = f"{summary.date}  {summary.distance_km:6.1f} km  {summary.name}"
-            if not refresh and client.cache.has("activity", sid):
-                skipped_cached += 1
-                click.echo(f"  cached  {label}")
-                continue
-            click.echo(f"  add     {label}")
-            client.cache.set("activity", sid, activity)
-            added += 1
-    except (StravaScopeError, StravaRateLimitError) as e:
-        raise click.ClickException(str(e)) from e
-
-    click.echo(
-        f"\nDone. seen={seen}  matched={matched}  added={added}  "
-        f"skipped(cached)={skipped_cached}  skipped(filter)={skipped_filter}"
-    )
-
-
-@main.command(name="list")
-def list_rides() -> None:
-    """List rides currently in the local cache (id, date, distance, name)."""
-    rows = [(sid, Summary.from_activity(a)) for sid, a in _cache().iter_kind("activity")]
+    total = 0
+    rows: list[tuple[int, Summary]] = []
+    for sid, activity in _cache().iter_kind("summary"):
+        total += 1
+        if not _matches_filter(activity, allowed, min_distance_m):
+            continue
+        rows.append((sid, Summary.from_activity(activity)))
     rows.sort(key=lambda r: r[1].date, reverse=True)
     for sid, s in rows:
         click.echo(f"{sid:>12}  {s.date}  {s.distance_km:6.1f} km  {s.name}")
-    click.echo(f"\n{len(rows)} cached.")
+    click.echo(f"\n{len(rows)} of {total} cached match.")
