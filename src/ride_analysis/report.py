@@ -76,7 +76,7 @@ def _stop_lines(
     elif arrive:
         lines.append(arrive)
     if rest_s is not None:
-        lines.append("0m" if rest_s == 0 else f"{_fmt_dur(rest_s)}")
+        lines.append("0m" if rest_s == 0 else _fmt_dur(rest_s))
     return lines
 
 

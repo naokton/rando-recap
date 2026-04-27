@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,10 @@ from .strava import StravaClient, StravaRateLimitError, StravaScopeError
 APP_NAME = "ride-analysis"
 
 
+def _cache() -> Cache:
+    return Cache(Path(user_cache_dir(APP_NAME)) / "cache.db")
+
+
 def _client() -> StravaClient:
     load_dotenv()
     client_id = os.environ.get("STRAVA_CLIENT_ID")
@@ -30,9 +35,25 @@ def _client() -> StravaClient:
         raise click.ClickException(
             "STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET not set. Copy .env.example to .env and fill them in."
         )
-    cache = Cache(Path(user_cache_dir(APP_NAME)) / "cache.db")
     token_path = Path(user_config_dir(APP_NAME)) / "token.json"
-    return StravaClient(client_id, client_secret, token_path, cache)
+    return StravaClient(client_id, client_secret, token_path, _cache())
+
+
+@dataclass(frozen=True)
+class Summary:
+    """Compact view of a Strava activity used by the fetch and list commands."""
+
+    date: str
+    distance_km: float
+    name: str
+
+    @classmethod
+    def from_activity(cls, activity: dict[str, Any]) -> Summary:
+        return cls(
+            date=(activity.get("start_date_local") or activity.get("start_date") or "")[:10],
+            distance_km=float(activity.get("distance") or 0) / 1000,
+            name=activity.get("name", ""),
+        )
 
 
 _DURATION_RE = re.compile(r"^(\d+)\s*(s|m|h)?$", re.IGNORECASE)
@@ -196,26 +217,23 @@ def fetch(
 
     seen = matched = skipped_cached = added = skipped_filter = 0
     try:
-        for summary in client.list_athlete_activities(after=after):
+        for activity in client.list_athlete_activities(after=after):
             seen += 1
-            if not _is_randonneuring(summary, allowed, min_distance_m):
+            if not _is_randonneuring(activity, allowed, min_distance_m):
                 skipped_filter += 1
                 continue
             matched += 1
-            sid = int(summary["id"])
-            date = (summary.get("start_date_local") or summary.get("start_date") or "")[:10]
-            distance_km = float(summary.get("distance") or 0) / 1000
-            label = f"{date}  {distance_km:6.1f} km  {summary.get('name', '')}"
-            if not refresh and client.cache.get("activity", sid) is not None:
+            sid = int(activity["id"])
+            summary = Summary.from_activity(activity)
+            label = f"{summary.date}  {summary.distance_km:6.1f} km  {summary.name}"
+            if not refresh and client.cache.has("activity", sid):
                 skipped_cached += 1
                 click.echo(f"  cached  {label}")
                 continue
             click.echo(f"  add     {label}")
-            client.cache.set("activity", sid, summary)
+            client.cache.set("activity", sid, activity)
             added += 1
-    except StravaScopeError as e:
-        raise click.ClickException(str(e)) from e
-    except StravaRateLimitError as e:
+    except (StravaScopeError, StravaRateLimitError) as e:
         raise click.ClickException(str(e)) from e
 
     click.echo(
@@ -227,14 +245,8 @@ def fetch(
 @main.command(name="list")
 def list_rides() -> None:
     """List rides currently in the local cache (id, date, distance, name)."""
-    cache = _client().cache
-    rows: list[tuple[str, int, float, str]] = []
-    for sid, activity in cache.iter_kind("activity"):
-        date = (activity.get("start_date_local") or activity.get("start_date") or "")[:10]
-        distance_km = float(activity.get("distance") or 0) / 1000
-        name = activity.get("name", "")
-        rows.append((date, sid, distance_km, name))
-    rows.sort(key=lambda r: r[0], reverse=True)
-    for date, sid, distance_km, name in rows:
-        click.echo(f"{sid:>12}  {date}  {distance_km:6.1f} km  {name}")
+    rows = [(sid, Summary.from_activity(a)) for sid, a in _cache().iter_kind("activity")]
+    rows.sort(key=lambda r: r[1].date, reverse=True)
+    for sid, s in rows:
+        click.echo(f"{sid:>12}  {s.date}  {s.distance_km:6.1f} km  {s.name}")
     click.echo(f"\n{len(rows)} cached.")

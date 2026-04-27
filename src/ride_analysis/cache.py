@@ -35,6 +35,10 @@ class Cache:
         row = self._conn.execute("SELECT json FROM blobs WHERE kind = ? AND id = ?", (kind, id_)).fetchone()
         return json.loads(row[0]) if row else None
 
+    def has(self, kind: str, id_: int) -> bool:
+        row = self._conn.execute("SELECT 1 FROM blobs WHERE kind = ? AND id = ?", (kind, id_)).fetchone()
+        return row is not None
+
     def set(self, kind: str, id_: int, data: dict[str, Any]) -> None:
         self._conn.execute(
             "INSERT OR REPLACE INTO blobs (kind, id, json) VALUES (?, ?, ?)",
