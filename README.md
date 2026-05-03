@@ -14,7 +14,7 @@ Garmin pauses at stops, leaving gaps in the time stream).
 
    ```bash
    uv sync
-   uv run ride login
+   uv run app login
    ```
 
    A browser tab opens; approve access. The token is stored under your OS
@@ -24,10 +24,10 @@ Garmin pauses at stops, leaving gaps in the time stream).
 ## Usage
 
 ```bash
-uv run ride analyze <activity_id>
-uv run ride analyze <activity_id> --min-stop 10m   # raise control threshold
-uv run ride analyze <activity_id> --json           # structured output
-uv run ride analyze <activity_id> --refresh        # bypass local cache
+uv run app analyze <activity_id>
+uv run app analyze <activity_id> --min-stop 10m   # raise control threshold
+uv run app analyze <activity_id> --json           # structured output
+uv run app analyze <activity_id> --refresh        # bypass local cache
 ```
 
 `<activity_id>` is the integer at the end of a Strava activity URL.
@@ -41,9 +41,9 @@ activities, no per-ride detail call) — the summary already carries every
 field `analyze` needs. Streams are still fetched on demand by `analyze`.
 
 ```bash
-uv run ride fetch                          # last month, ≥190 km, Ride/GravelRide
-uv run ride fetch --since all              # first-time full sync
-uv run ride fetch --since 6m --min-distance 200
+uv run app fetch                          # last month, ≥190 km, Ride/GravelRide
+uv run app fetch --since all              # first-time full sync
+uv run app fetch --since 6m --min-distance 200
 ```
 
 `--since` accepts `Nd` / `Nw` / `Nm` / `Ny` (days/weeks/months/years), `all`,
@@ -54,7 +54,7 @@ skipped — and respects Strava's rate limits (sleeps near the 100-req /
 To see which rides are in the cache (and grab an id for `analyze`):
 
 ```bash
-uv run ride list
+uv run app list
 ```
 
 The terminal report shows:
@@ -83,5 +83,7 @@ Planned for later iterations (not built yet):
 ## Development
 
 ```bash
+make format
+make typecheck
 uv run pytest
 ```
