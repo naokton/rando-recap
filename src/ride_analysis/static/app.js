@@ -288,10 +288,14 @@ async function renderAnalysis(rideId, minStop) {
   const model = buildTimelineModel(data.controls, data.segments);
   root.appendChild(renderTimeline(data.activity, data.controls, model));
 
-  root.appendChild(el("h2", {}, "Controls"));
-  root.appendChild(renderControlsTable(data.activity, data.controls, model.cumKm));
-  root.appendChild(el("h2", {}, "Segments"));
-  root.appendChild(renderSegmentsTable(data.segments));
+  root.appendChild(el("div", { class: "tables-row" },
+    el("section", {},
+      el("h2", {}, "Controls"),
+      renderControlsTable(data.activity, data.controls, model.cumKm)),
+    el("section", {},
+      el("h2", {}, "Segments"),
+      renderSegmentsTable(data.segments)),
+  ));
 
   root.appendChild(el("h2", {}, "Map"));
   const mapDiv = el("div", { id: "map" });

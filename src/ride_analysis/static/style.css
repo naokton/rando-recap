@@ -113,6 +113,12 @@ table.rides td.dist { text-align: right }
 
 /* Tables */
 h2 { font-size: 14px; margin: 24px 0 8px; color: var(--muted); font-weight: 600; }
+.tables-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 32px;
+}
+.tables-row > section { flex: 0 1 auto; min-width: 0; }
 table.data {
   border-collapse: collapse;
   margin-bottom: 16px;
