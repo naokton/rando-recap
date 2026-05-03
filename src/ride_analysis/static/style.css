@@ -134,6 +134,26 @@ table.data tr.row:hover { background: var(--bg-soft); }
 
 /* Map */
 #map { height: 480px; border: 1px solid var(--border); border-radius: 4px; }
+#map.map-fullscreen {
+  position: fixed !important;
+  inset: 0;
+  height: 100vh;
+  width: 100vw;
+  z-index: 9999;
+  border: 0;
+  border-radius: 0;
+}
+body.map-fullscreen-active { overflow: hidden; }
+.fullscreen-btn {
+  width: 30px; height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-size: 18px;
+  color: var(--fg);
+  background: white;
+  text-decoration: none;
+}
+.fullscreen-btn:hover { background: var(--bg-soft); }
 
 .empty, .error { color: var(--muted); padding: 16px 0; }
 .error { color: #b91c1c; }

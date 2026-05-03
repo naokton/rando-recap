@@ -278,8 +278,68 @@ function renderMap(container, polyline, controls, activity, model) {
       `${fmtClock(endS)}`
     );
 
-  map.fitBounds(line.getBounds(), { padding: [20, 20] });
+  const bounds = line.getBounds();
+  map.fitBounds(bounds, { padding: [20, 20] });
+  addFullscreenControl(map, container, bounds);
   mapInstance = map;
+}
+
+function addFullscreenControl(map, container, bounds) {
+  let btn;
+  let on = false;
+  let escHandler = null;
+
+  const applyClasses = () => {
+    container.classList.toggle("map-fullscreen", on);
+    document.body.classList.toggle("map-fullscreen-active", on);
+    btn.innerHTML = on ? "⤡" : "⤢";
+    btn.title = on ? "Exit fullscreen" : "Toggle fullscreen";
+  };
+
+  const toggle = () => {
+    on = !on;
+    if (on) {
+      escHandler = (e) => { if (e.key === "Escape") toggle(); };
+      document.addEventListener("keydown", escHandler);
+    } else if (escHandler) {
+      document.removeEventListener("keydown", escHandler);
+      escHandler = null;
+    }
+    applyClasses();
+    setTimeout(() => {
+      map.invalidateSize();
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }, 0);
+  };
+
+  const cleanup = () => {
+    if (escHandler) {
+      document.removeEventListener("keydown", escHandler);
+      escHandler = null;
+    }
+    if (on) {
+      on = false;
+      applyClasses();
+    }
+  };
+
+  const Ctrl = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd() {
+      btn = el("a", {
+        class: "leaflet-bar leaflet-control fullscreen-btn",
+        href: "#",
+        title: "Toggle fullscreen",
+        role: "button",
+      }, "⤢");
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.disableScrollPropagation(btn);
+      L.DomEvent.on(btn, "click", (e) => { L.DomEvent.preventDefault(e); toggle(); });
+      return btn;
+    },
+  });
+  map.addControl(new Ctrl());
+  map.on("unload", cleanup);
 }
 
 async function renderAnalysis(rideId, minStop) {
