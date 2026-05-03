@@ -357,6 +357,9 @@ function addFullscreenControl(map, container, bounds) {
 
 async function renderAnalysis(rideId, minStop) {
   crumb.textContent = `ride ${rideId}`;
+
+  // ---------------------
+  // Loading
   root.innerHTML = "";
   root.appendChild(el("div", { class: "empty" }, "Loading…"));
   let data;
@@ -369,6 +372,8 @@ async function renderAnalysis(rideId, minStop) {
   }
   root.innerHTML = "";
 
+  // ---------------------
+  // Title & Info
   const a = data.activity;
   root.appendChild(el("h2", { class: "ride-title" },
     a.name || "(unnamed ride)",
@@ -397,9 +402,21 @@ async function renderAnalysis(rideId, minStop) {
     el("button", { onclick: apply }, "Apply"),
   ));
 
+  // ---------------------
+  // Map
+  root.appendChild(el("h2", {}, "Map"));
+  const mapDiv = el("div", { id: "map" });
+  root.appendChild(mapDiv);
+  // Leaflet needs the container in the DOM with size before init.
+  setTimeout(() => renderMap(mapDiv, data.polyline, data.controls, data.activity, model), 0);
+
+  // ---------------------
+  // Timeline
   const model = buildTimelineModel(data.controls, data.segments);
   root.appendChild(renderTimeline(data.activity, data.controls, model));
 
+  // ---------------------
+  // Table
   root.appendChild(el("div", { class: "tables-row" },
     el("section", {},
       el("h2", {}, "Controls"),
@@ -408,12 +425,6 @@ async function renderAnalysis(rideId, minStop) {
       el("h2", {}, "Segments"),
       renderSegmentsTable(data.segments)),
   ));
-
-  root.appendChild(el("h2", {}, "Map"));
-  const mapDiv = el("div", { id: "map" });
-  root.appendChild(mapDiv);
-  // Leaflet needs the container in the DOM with size before init.
-  setTimeout(() => renderMap(mapDiv, data.polyline, data.controls, data.activity, model), 0);
 }
 
 // --- routing ------------------------------------------------------------
