@@ -223,7 +223,7 @@ function renderSegmentsTable(segments) {
 }
 
 let mapInstance = null;
-function renderMap(container, polyline, controls) {
+function renderMap(container, polyline, controls, activity, model) {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
   if (!polyline || !polyline.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
@@ -235,10 +235,38 @@ function renderMap(container, polyline, controls) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
   const line = L.polyline(polyline, { color: "#047857", weight: 3 }).addTo(map);
+  const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
+  const { cumKm, orderedSegs } = model;
+  const endS = endSeconds(controls, orderedSegs);
+  const totalKm = cumKm[cumKm.length - 1].toFixed(1);
+
+  L.marker(polyline[0]).addTo(map)
+    .bindPopup(
+      `<b>Start</b><br>` +
+      `0.0 km<br>` +
+      `${fmtClock(0)}`
+    );
+
   controls.forEach((c, i) => {
+    const km = cumKm[i + 1].toFixed(1);
+    const arrive = fmtClock(c.time_before_s);
+    const depart = fmtClock(c.time_after_s);
     L.marker([c.lat, c.lng]).addTo(map)
-      .bindPopup(`<b>C${i + 1}</b><br>rest: ${fmtDur(c.rest_s)}`);
+      .bindPopup(
+        `<b>C${i + 1}</b><br>` +
+        `${km} km<br>` +
+        `${arrive} → ${depart}<br>` +
+        `${fmtDur(c.rest_s)}`
+      );
   });
+
+  L.marker(polyline[polyline.length - 1]).addTo(map)
+    .bindPopup(
+      `<b>End</b><br>` +
+      `${totalKm} km<br>` +
+      `${fmtClock(endS)}`
+    );
+
   map.fitBounds(line.getBounds(), { padding: [20, 20] });
   mapInstance = map;
 }
@@ -301,7 +329,7 @@ async function renderAnalysis(rideId, minStop) {
   const mapDiv = el("div", { id: "map" });
   root.appendChild(mapDiv);
   // Leaflet needs the container in the DOM with size before init.
-  setTimeout(() => renderMap(mapDiv, data.polyline, data.controls), 0);
+  setTimeout(() => renderMap(mapDiv, data.polyline, data.controls, data.activity, model), 0);
 }
 
 // --- routing ------------------------------------------------------------
