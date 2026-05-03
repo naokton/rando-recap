@@ -47,6 +47,9 @@ table.rides tr.row:hover { background: var(--bg-soft); }
 table.rides td.dist { text-align: right }
 
 /* Analysis header */
+.ride-title { color: var(--fg); font-size: 18px; font-weight: 600; margin-top: 0; }
+.ride-title .date { color: var(--muted); font-weight: 400; margin-left: 8px; }
+
 .summary { display: flex; flex-wrap: wrap; gap: 16px 28px; margin: 8px 0 16px; }
 .summary .item { font-variant-numeric: tabular-nums; }
 .summary .label { color: var(--muted); margin-right: 6px; }

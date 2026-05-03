@@ -258,9 +258,9 @@ async function renderAnalysis(rideId, minStop) {
   root.innerHTML = "";
 
   const a = data.activity;
-  root.appendChild(el("h2", { style: "color: var(--fg); font-size: 18px; font-weight: 600; margin-top: 0" },
+  root.appendChild(el("h2", { class: "ride-title" },
     a.name || "(unnamed ride)",
-    el("span", { style: "color: var(--muted); font-weight: 400; margin-left: 8px" },
+    el("span", { class: "date" },
       `(${(a.start_date_local || a.start_date || "").slice(0, 10)})`)));
 
   root.appendChild(el("div", { class: "summary" },
