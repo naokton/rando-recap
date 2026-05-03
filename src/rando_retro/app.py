@@ -37,8 +37,7 @@ def client() -> StravaClient:
     client_secret = os.environ.get("STRAVA_CLIENT_SECRET")
     if not client_id or not client_secret:
         raise ConfigError(
-            "STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET not set. "
-            "Copy .env.example to .env and fill them in."
+            "STRAVA_CLIENT_ID / STRAVA_CLIENT_SECRET not set. Copy .env.example to .env and fill them in."
         )
     token_path = Path(user_config_dir(APP_NAME)) / "token.json"
     return StravaClient(client_id, client_secret, token_path, cache())
@@ -84,9 +83,7 @@ def matches_filter(
     return float(activity.get("distance") or 0) >= min_distance_m
 
 
-def list_summaries(
-    allowed_types: set[str], min_distance_m: float
-) -> tuple[int, list[tuple[int, Summary]]]:
+def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int, list[tuple[int, Summary]]]:
     """Return (total_cached, [(id, Summary)] sorted newest-first) for matching rides."""
     rows: list[tuple[int, Summary]] = []
     total = 0
@@ -125,14 +122,10 @@ def analyze_activity(
     """Auth is the caller's job. Raises ActivityNotCachedError, MissingStreamsError, or StravaScopeError."""
     activity = sclient.cache.get("summary", activity_id)
     if activity is None:
-        raise ActivityNotCachedError(
-            f"Activity {activity_id} not in cache. Run `ride fetch` first."
-        )
+        raise ActivityNotCachedError(f"Activity {activity_id} not in cache. Run `ride fetch` first.")
     streams = sclient.get_streams(activity_id, refresh=refresh)
     if "time" not in streams or "latlng" not in streams:
-        raise MissingStreamsError(
-            "Activity is missing 'time' or 'latlng' streams (no GPS?)."
-        )
+        raise MissingStreamsError("Activity is missing 'time' or 'latlng' streams (no GPS?).")
     controls = detect_controls(
         time_s=streams["time"]["data"],
         latlng=streams["latlng"]["data"],
