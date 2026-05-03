@@ -253,7 +253,7 @@ function renderMap(container, polyline, controls, activity, model) {
     const km = cumKm[i + 1].toFixed(1);
     const arrive = fmtClock(c.time_before_s);
     const depart = fmtClock(c.time_after_s);
-    L.circleMarker([c.lat, c.lng], {
+    const marker = L.circleMarker([c.lat, c.lng], {
       // Radius scales with sqrt(rest_s / maxRest) so circle *area* is roughly
       // proportional to rest time. Normalizing to maxRest keeps the longest rest
       // at maxR (so it always fits on the map) while preserving relative size
@@ -263,12 +263,15 @@ function renderMap(container, polyline, controls, activity, model) {
       weight: 1,
       fillColor: "#dc2626",
       fillOpacity: 0.2,
-    }).addTo(map).bindPopup(
+    }).addTo(map).bindTooltip(
       `<b>C${i + 1}</b><br>` +
       `${km} km<br>` +
       `${arrive} → ${depart}<br>` +
-      `${fmtDur(c.rest_s)}`
+      `${fmtDur(c.rest_s)}`,
+      { direction: "top", offset: [0, -4] }
     );
+    marker.on("mouseover", () => marker.setStyle({ weight: 3 }));
+    marker.on("mouseout", () => marker.setStyle({ weight: 1 }));
   });
 
   L.marker(polyline[polyline.length - 1]).addTo(map)
