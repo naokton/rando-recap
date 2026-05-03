@@ -134,6 +134,7 @@ table.data th, table.data td {
 table.data th { color: var(--muted); font-weight: 500; text-align: right; }
 table.data th:first-child, table.data td:first-child { text-align: left; }
 table.data td { text-align: right; }
+table.data tr.row:hover { background: var(--bg-soft); }
 
 /* Map */
 #map { height: 480px; border: 1px solid var(--border); border-radius: 4px; }
