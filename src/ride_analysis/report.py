@@ -302,24 +302,31 @@ def render_terminal(
     console.print(Padding(st, _PAD))
 
 
+def build_payload(
+    activity: dict[str, Any],
+    controls: list[Control],
+    segments: list[Segment],
+) -> dict[str, Any]:
+    return {
+        "activity": {
+            "id": activity.get("id"),
+            "name": activity.get("name"),
+            "start_date": activity.get("start_date"),
+            "start_date_local": activity.get("start_date_local"),
+            "utc_offset_s": int(activity.get("utc_offset") or 0),
+            "distance_m": activity.get("distance"),
+            "elapsed_time_s": activity.get("elapsed_time"),
+            "moving_time_s": activity.get("moving_time"),
+            "total_elevation_gain_m": activity.get("total_elevation_gain"),
+        },
+        "controls": [{**asdict(c), "rest_s": c.rest_s} for c in controls],
+        "segments": [asdict(s) for s in segments],
+    }
+
+
 def render_json(
     activity: dict[str, Any],
     controls: list[Control],
     segments: list[Segment],
 ) -> str:
-    return json.dumps(
-        {
-            "activity": {
-                "id": activity.get("id"),
-                "name": activity.get("name"),
-                "start_date": activity.get("start_date"),
-                "distance_m": activity.get("distance"),
-                "elapsed_time_s": activity.get("elapsed_time"),
-                "moving_time_s": activity.get("moving_time"),
-                "total_elevation_gain_m": activity.get("total_elevation_gain"),
-            },
-            "controls": [asdict(c) for c in controls],
-            "segments": [asdict(s) for s in segments],
-        },
-        indent=2,
-    )
+    return json.dumps(build_payload(activity, controls, segments), indent=2)
