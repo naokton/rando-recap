@@ -34,16 +34,17 @@ table.rides {
   border-collapse: collapse;
   width: 100%;
   max-width: 900px;
+  table-layout: fixed;
 }
 table.rides th, table.rides td {
-  text-align: left;
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
 }
+table.rides th.date, table.rides th.dist { width: 8em; }
 table.rides th { color: var(--muted); font-weight: 500; }
 table.rides tr.row { cursor: pointer; }
 table.rides tr.row:hover { background: var(--bg-soft); }
-td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.rides td.dist { text-align: right }
 
 /* Analysis header */
 .summary { display: flex; flex-wrap: wrap; gap: 16px 28px; margin: 8px 0 16px; }

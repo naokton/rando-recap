@@ -83,23 +83,21 @@ async function renderList() {
   // render list
   const table = el("table", { class: "rides" },
     el("thead", {}, el("tr", {},
-      el("th", {}, "Date"),
-      el("th", { class: "num" }, "Distance"),
-      el("th", {}, "Name"),
+      el("th", { class: "date" }, "Date"),
+      el("th", { class: "dist" }, "Distance"),
+      el("th", { class: "name" }, "Name"),
     )),
     el("tbody", {},
       data.rides.map(r =>
         el("tr", { class: "row", onclick: () => navigate(r.id) },
-          el("td", {}, r.date),
-          el("td", { class: "num" }, `${r.distance_km.toFixed(1)} km`),
-          el("td", {}, r.name),
+          el("td", { class: "date" }, r.date),
+          el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
+          el("td", { class: "name" }, r.name),
         )
       )
     ),
   );
   root.appendChild(table);
-  root.appendChild(el("div", { class: "empty" },
-    `${data.rides.length} of ${data.total_cached} cached match.`));
 }
 
 // --- analysis view ------------------------------------------------------
