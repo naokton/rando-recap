@@ -81,8 +81,6 @@ table.rides td.dist { text-align: right }
 .stop-cell {
   grid-row: 1;
   text-align: center;
-  padding: 0 12px;
-  min-width: 90px;
 }
 .stop-cell .lab { font-weight: 700; }
 .stop-cell .km { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -100,17 +98,15 @@ table.rides td.dist { text-align: right }
 .track-seg {
   grid-row: 2;
   height: 2px; background: var(--track); align-self: center;
-  min-width: 60px;
 }
 
 .seg-cell {
   grid-row: 3;
   text-align: center;
-  padding: 4px 8px;
+  padding: 4px 0px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  min-width: 110px;
 }
 .seg-cell .km { color: var(--fg); font-weight: 600; }
 
