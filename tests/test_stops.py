@@ -1,4 +1,4 @@
-from ride_analysis.stops import detect_controls
+from rando_retro.stops import detect_controls
 
 
 def test_detects_stop_above_threshold():

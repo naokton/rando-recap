@@ -1,5 +1,5 @@
-from ride_analysis.segments import build_segments
-from ride_analysis.stops import Control
+from rando_retro.segments import build_segments
+from rando_retro.stops import Control
 
 
 def _streams(time_s, distance, **extras):

@@ -1,5 +1,5 @@
 [project]
-name = "ride-analysis"
+name = "rando-retro"
 version = "0.1.0"
 description = "Randonneuring ride analysis from Strava activity streams"
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ride = "ride_analysis.cli:main"
+ride = "rando_retro.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.10.10,<0.11.0"]
