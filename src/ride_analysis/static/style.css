@@ -157,3 +157,11 @@ body.map-fullscreen-active { overflow: hidden; }
 
 .empty, .error { color: var(--muted); padding: 16px 0; }
 .error { color: #b91c1c; }
+
+/* Linked hover highlight across map / timeline / tables */
+.stop-cell.hl, .seg-cell.hl { background: #d1fae5; border-radius: 4px; }
+table.data tr.row.hl,
+table.data tr.row.hl:hover { background: #d1fae5; }
+.leaflet-marker-icon.hl-marker {
+  filter: drop-shadow(0 0 4px var(--accent)) brightness(1.05);
+}

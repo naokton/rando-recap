@@ -57,6 +57,56 @@ async function fetchJson(url) {
   return r.json();
 }
 
+// --- linked hover/highlight --------------------------------------------
+// Stops and segments appear on the map, timeline, and tables. Hovering one
+// peer highlights the others. DOM peers carry data-stop / data-seg keys
+// (stops: "start" / "end" / "c<i>"; segments: the label string). Map markers
+// register an applyHighlight callback in link.stop.markers.
+let link = null;
+const HOVER_KINDS = ["stop", "seg"];
+
+function makeLink() {
+  return {
+    stop: { hovered: null, markers: new Map() },
+    seg:  { hovered: null },
+  };
+}
+
+function applyHover(kind, key) {
+  if (!link) return;
+  const k = link[kind];
+  const active = k.hovered === key;
+  root.querySelectorAll(`[data-${kind}="${CSS.escape(key)}"]`)
+    .forEach(el => el.classList.toggle("hl", active));
+  const m = k.markers && k.markers.get(key);
+  if (m) m.applyHighlight(active);
+}
+
+function setHover(kind, key) {
+  if (!link) return;
+  const k = link[kind];
+  if (k.hovered === key) return;
+  const prev = k.hovered;
+  k.hovered = key;
+  if (prev) applyHover(kind, prev);
+  if (key) applyHover(kind, key);
+}
+
+root.addEventListener("mouseover", (e) => {
+  for (const kind of HOVER_KINDS) {
+    const el = e.target.closest(`[data-${kind}]`);
+    if (el) setHover(kind, el.dataset[kind]);
+  }
+});
+root.addEventListener("mouseout", (e) => {
+  // mouseout fires on transitions between children too; only clear when the
+  // cursor actually leaves the tagged element.
+  for (const kind of HOVER_KINDS) {
+    const el = e.target.closest(`[data-${kind}]`);
+    if (el && !el.contains(e.relatedTarget)) setHover(kind, null);
+  }
+});
+
 // --- list view ----------------------------------------------------------
 async function renderList() {
   crumb.textContent = "";
@@ -108,7 +158,7 @@ function buildTimelineModel(controls, segments) {
   const orderedSegs = segLabels.map(l => segByLabel[l] ?? null);
   const cumKm = [0];
   for (const s of orderedSegs) cumKm.push(cumKm[cumKm.length - 1] + (s ? s.distance_m / 1000 : 0));
-  return { stopLabels, orderedSegs, cumKm };
+  return { stopLabels, segLabels, orderedSegs, cumKm };
 }
 
 function endSeconds(controls, orderedSegs) {
@@ -121,7 +171,7 @@ function endSeconds(controls, orderedSegs) {
 
 function renderTimeline(activity, controls, model) {
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
-  const { stopLabels, orderedSegs, cumKm } = model;
+  const { stopLabels, segLabels, orderedSegs, cumKm } = model;
   const endS = endSeconds(controls, orderedSegs);
 
   const wrap = el("div", { class: "timeline-wrap" });
@@ -130,17 +180,20 @@ function renderTimeline(activity, controls, model) {
   // Build columns: stop, seg, stop, seg, ..., stop
   let col = 1;
   stopLabels.forEach((label, i) => {
-    let arrive = null, depart = null, rest = null;
-    if (label === "Start") { depart = fmtClock(0); rest = 0; }
-    else if (label === "End") { arrive = fmtClock(endS); rest = 0; }
+    let arrive = null, depart = null, rest = null, stopKey;
+    if (label === "Start") { depart = fmtClock(0); rest = 0; stopKey = "start"; }
+    else if (label === "End") { arrive = fmtClock(endS); rest = 0; stopKey = "end"; }
     else {
       const c = controls[i - 1];
       arrive = fmtClock(c.time_before_s);
       depart = fmtClock(c.time_after_s);
       rest = c.rest_s;
+      stopKey = `c${i - 1}`;
     }
     const stopCol = col++;
-    grid.appendChild(el("div", { class: "stop-cell", style: `grid-column: ${stopCol}` },
+    grid.appendChild(el("div", {
+      class: "stop-cell", style: `grid-column: ${stopCol}`, "data-stop": stopKey,
+    },
       el("div", { class: "lab" }, label),
       el("div", { class: "km" }, `${cumKm[i].toFixed(1)} km`),
       el("div", { class: "clock" },
@@ -154,7 +207,9 @@ function renderTimeline(activity, controls, model) {
       const segCol = col++;
       grid.appendChild(el("div", { class: "track-seg", style: `grid-column: ${segCol}` }));
       const s = orderedSegs[i];
-      const cell = el("div", { class: "seg-cell", style: `grid-column: ${segCol}` });
+      const cell = el("div", {
+        class: "seg-cell", style: `grid-column: ${segCol}`, "data-seg": segLabels[i],
+      });
       if (!s) {
         cell.appendChild(el("div", {}, "(no movement)"));
       } else {
@@ -185,7 +240,7 @@ function renderControlsTable(activity, controls, cumKm) {
       el("th", {}, "Depart"),
       el("th", {}, "Rest"),
     )),
-    el("tbody", {}, controls.map((c, i) => el("tr", { class: "row" },
+    el("tbody", {}, controls.map((c, i) => el("tr", { class: "row", "data-stop": `c${i}` },
       el("td", {}, `C${i + 1}`),
       el("td", {}, cumKm[i + 1].toFixed(1)),
       el("td", {}, fmtClock(c.time_before_s)),
@@ -208,7 +263,7 @@ function renderSegmentsTable(segments) {
       el("th", {}, "Climb (m)"),
       el("th", {}, "m/km"),
     )),
-    el("tbody", {}, segments.map(s => el("tr", { class: "row" },
+    el("tbody", {}, segments.map(s => el("tr", { class: "row", "data-seg": s.label },
       el("td", {}, s.label),
       el("td", {}, (s.distance_m / 1000).toFixed(2)),
       el("td", {}, fmtDur(s.duration_s)),
@@ -240,12 +295,23 @@ function renderMap(container, polyline, controls, activity, model) {
   const endS = endSeconds(controls, orderedSegs);
   const totalKm = cumKm[cumKm.length - 1].toFixed(1);
 
-  L.marker(polyline[0]).addTo(map)
+  const registerStopMarker = (key, marker, applyHighlight) => {
+    link.stop.markers.set(key, { applyHighlight });
+    marker.on("mouseover", () => setHover("stop", key));
+    marker.on("mouseout", () => setHover("stop", null));
+  };
+  const iconHighlight = (marker) => (on) => {
+    const elt = marker.getElement();
+    if (elt) elt.classList.toggle("hl-marker", on);
+  };
+
+  const startMarker = L.marker(polyline[0]).addTo(map)
     .bindPopup(
       `<b>Start</b><br>` +
       `0.0 km<br>` +
       `${fmtClock(0)}`
     );
+  registerStopMarker("start", startMarker, iconHighlight(startMarker));
 
   const maxRest = Math.max(1, ...controls.map(c => c.rest_s || 0));
   const minR = 3, maxR = 40;
@@ -280,16 +346,18 @@ function renderMap(container, polyline, controls, activity, model) {
       `${fmtDur(c.rest_s)}`,
       { direction: "top", offset: [0, -4] }
     );
-    marker.on("mouseover", () => marker.setStyle({ weight: 3 }));
-    marker.on("mouseout", () => marker.setStyle({ weight: 1 }));
+    registerStopMarker(`c${i}`, marker, (on) => {
+      marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
+    });
   });
 
-  L.marker(polyline[polyline.length - 1]).addTo(map)
+  const endMarker = L.marker(polyline[polyline.length - 1]).addTo(map)
     .bindPopup(
       `<b>End</b><br>` +
       `${totalKm} km<br>` +
       `${fmtClock(endS)}`
     );
+  registerStopMarker("end", endMarker, iconHighlight(endMarker));
 
   const bounds = line.getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
@@ -371,6 +439,7 @@ async function renderAnalysis(rideId, minStop) {
     return;
   }
   root.innerHTML = "";
+  link = makeLink();
 
   // ---------------------
   // Title & Info
