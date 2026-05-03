@@ -60,16 +60,23 @@ async function fetchJson(url) {
 // --- linked hover/highlight --------------------------------------------
 // Stops and segments appear on the map, timeline, and tables. Hovering one
 // peer highlights the others. DOM peers carry data-stop / data-seg keys
-// (stops: "start" / "end" / "c<i>"; segments: the label string). Map markers
-// register an applyHighlight callback in link.stop.markers.
+// (stops: "start" / "end" / "c<i>"; segments: the label string). Map peers
+// (stop markers and segment polylines) register a highlight callback in
+// link.<kind>.peers via registerMapPeer.
 let link = null;
 const HOVER_KINDS = ["stop", "seg"];
 
 function makeLink() {
   return {
-    stop: { hovered: null, markers: new Map() },
-    seg:  { hovered: null },
+    stop: { hovered: null, peers: new Map() },
+    seg:  { hovered: null, peers: new Map() },
   };
+}
+
+function registerMapPeer(kind, key, source, applyHighlight) {
+  link[kind].peers.set(key, applyHighlight);
+  source.on("mouseover", () => setHover(kind, key));
+  source.on("mouseout", () => setHover(kind, null));
 }
 
 function applyHover(kind, key) {
@@ -78,8 +85,8 @@ function applyHover(kind, key) {
   const active = k.hovered === key;
   root.querySelectorAll(`[data-${kind}="${CSS.escape(key)}"]`)
     .forEach(el => el.classList.toggle("hl", active));
-  const m = k.markers && k.markers.get(key);
-  if (m) m.applyHighlight(active);
+  const m = k.peers.get(key);
+  if (m) m(active);
 }
 
 function setHover(kind, key) {
@@ -278,40 +285,49 @@ function renderSegmentsTable(segments) {
 }
 
 let mapInstance = null;
-function renderMap(container, polyline, controls, activity, model) {
+function renderMap(container, segments, controls, activity, model) {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-  if (!polyline || !polyline.length) {
+  const segsWithGps = segments.filter(s => s.polyline && s.polyline.length);
+  if (!segsWithGps.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
     return;
   }
-  const map = L.map(container).setView(polyline[0], 11);
+  const firstPt = segsWithGps[0].polyline[0];
+  const lastPts = segsWithGps[segsWithGps.length - 1].polyline;
+  const lastPt = lastPts[lastPts.length - 1];
+
+  const map = L.map(container).setView(firstPt, 11);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
-  const line = L.polyline(polyline, { color: "#047857", weight: 3 }).addTo(map);
+
+  const segLines = segsWithGps.map(s => {
+    const line = L.polyline(s.polyline, { color: "#047857", weight: 3 }).addTo(map);
+    registerMapPeer("seg", s.label, line, (on) => {
+      line.setStyle({ color: on ? "#0ea5e9" : "#047857", weight: on ? 6 : 3 });
+      if (on) line.bringToFront();
+    });
+    return line;
+  });
+
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
   const { cumKm, orderedSegs } = model;
   const endS = endSeconds(controls, orderedSegs);
   const totalKm = cumKm[cumKm.length - 1].toFixed(1);
 
-  const registerStopMarker = (key, marker, applyHighlight) => {
-    link.stop.markers.set(key, { applyHighlight });
-    marker.on("mouseover", () => setHover("stop", key));
-    marker.on("mouseout", () => setHover("stop", null));
-  };
   const iconHighlight = (marker) => (on) => {
     const elt = marker.getElement();
     if (elt) elt.classList.toggle("hl-marker", on);
   };
 
-  const startMarker = L.marker(polyline[0]).addTo(map)
+  const startMarker = L.marker(firstPt).addTo(map)
     .bindPopup(
       `<b>Start</b><br>` +
       `0.0 km<br>` +
       `${fmtClock(0)}`
     );
-  registerStopMarker("start", startMarker, iconHighlight(startMarker));
+  registerMapPeer("stop", "start", startMarker, iconHighlight(startMarker));
 
   const maxRest = Math.max(1, ...controls.map(c => c.rest_s || 0));
   const minR = 3, maxR = 40;
@@ -346,20 +362,20 @@ function renderMap(container, polyline, controls, activity, model) {
       `${fmtDur(c.rest_s)}`,
       { direction: "top", offset: [0, -4] }
     );
-    registerStopMarker(`c${i}`, marker, (on) => {
+    registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
   });
 
-  const endMarker = L.marker(polyline[polyline.length - 1]).addTo(map)
+  const endMarker = L.marker(lastPt).addTo(map)
     .bindPopup(
       `<b>End</b><br>` +
       `${totalKm} km<br>` +
       `${fmtClock(endS)}`
     );
-  registerStopMarker("end", endMarker, iconHighlight(endMarker));
+  registerMapPeer("stop", "end", endMarker, iconHighlight(endMarker));
 
-  const bounds = line.getBounds();
+  const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
   mapInstance = map;
@@ -477,7 +493,7 @@ async function renderAnalysis(rideId, minStop) {
   const mapDiv = el("div", { id: "map" });
   root.appendChild(mapDiv);
   // Leaflet needs the container in the DOM with size before init.
-  setTimeout(() => renderMap(mapDiv, data.polyline, data.controls, data.activity, model), 0);
+  setTimeout(() => renderMap(mapDiv, data.segments, data.controls, data.activity, model), 0);
 
   // ---------------------
   // Timeline

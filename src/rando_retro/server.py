@@ -77,5 +77,7 @@ def analyze_ride(
         raise HTTPException(status_code=403, detail=str(e)) from e
 
     payload = build_payload(result.activity, result.controls, result.segments)
-    payload["polyline"] = result.streams["latlng"]["data"]
+    latlng = result.streams["latlng"]["data"]
+    for seg in payload["segments"]:
+        seg["polyline"] = latlng[seg["index_start"] : seg["index_end"] + 1]
     return payload
