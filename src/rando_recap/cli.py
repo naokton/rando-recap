@@ -177,4 +177,4 @@ def serve(host: str, port: int, reload: bool) -> None:
     """Run the local web UI + JSON API."""
     import uvicorn
 
-    uvicorn.run("rando_retro.server:app", host=host, port=port, reload=reload)
+    uvicorn.run("rando_recap.server:app", host=host, port=port, reload=reload)

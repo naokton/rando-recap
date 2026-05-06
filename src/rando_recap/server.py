@@ -23,7 +23,7 @@ from .strava import StravaScopeError
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="rando-retro", docs_url="/api/docs", openapi_url="/api/openapi.json")
+app = FastAPI(title="rando-recap", docs_url="/api/docs", openapi_url="/api/openapi.json")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 

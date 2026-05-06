@@ -1,4 +1,4 @@
-# Rando Retro (Randonneuring Retrospective)
+# Rando Recap
 
 Per-control and per-segment analysis of randonneuring rides, from Strava
 activity streams. Controls are auto-detected from gaps in the recording (your
@@ -18,7 +18,7 @@ Garmin pauses at stops, leaving gaps in the time stream).
    ```
 
    A browser tab opens; approve access. The token is stored under your OS
-   config dir (`~/Library/Application Support/rando-retro/token.json` on
+   config dir (`~/Library/Application Support/rando-recap/token.json` on
    macOS) and refreshed automatically.
 
 ## Usage
@@ -66,7 +66,7 @@ The terminal report shows:
 
 ## Caching
 
-API responses are cached at `~/Library/Caches/rando-retro/cache.db`
+API responses are cached at `~/Library/Caches/rando-recap/cache.db`
 (macOS) so re-runs and threshold tweaks don't re-hit Strava. Pass
 `--refresh` to force a fetch.
 

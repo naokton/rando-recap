@@ -17,7 +17,7 @@ from .segments import Segment, build_segments
 from .stops import Control, detect_controls
 from .strava import StravaClient
 
-APP_NAME = "rando-retro"
+APP_NAME = "rando-recap"
 
 load_dotenv()
 

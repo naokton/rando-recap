@@ -1,4 +1,4 @@
-from rando_retro.stops import detect_controls
+from rando_recap.stops import detect_controls
 
 
 def test_detects_stop_above_threshold():

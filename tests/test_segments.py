@@ -1,5 +1,5 @@
-from rando_retro.segments import build_segments
-from rando_retro.stops import Control
+from rando_recap.segments import build_segments
+from rando_recap.stops import Control
 
 
 def _streams(time_s, distance, **extras):

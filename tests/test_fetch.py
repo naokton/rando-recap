@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import click
 import pytest
 
-from rando_retro.app import matches_filter as _matches_filter
-from rando_retro.cli import _parse_since
+from rando_recap.app import matches_filter as _matches_filter
+from rando_recap.cli import _parse_since
 
 
 def test_parse_since_all_returns_none():
