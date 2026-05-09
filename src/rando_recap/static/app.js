@@ -115,46 +115,62 @@ root.addEventListener("mouseout", (e) => {
 });
 
 // --- list view ----------------------------------------------------------
-async function renderList() {
+const DEFAULT_MIN_DIST_KM = 190;
+const DEFAULT_MIN_STOP = "5m";
+
+function parseMinDist(s) {
+  const v = parseFloat(s);
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MIN_DIST_KM;
+}
+
+async function renderList(minDist) {
   crumb.textContent = "";
-  // loading
   root.innerHTML = "";
-  root.appendChild(el("div", { class: "empty" }, "Loading rides…"));
+
+  // Filter control — rendered first so it stays visible even when no rides match.
+  const minDistInput = el("input", {
+    type: "number", min: "0", step: "10", value: String(minDist),
+  });
+  const apply = () => navigateList(parseMinDist(minDistInput.value));
+  minDistInput.addEventListener("keydown", e => { if (e.key === "Enter") apply(); });
+  root.appendChild(el("div", { class: "controls-row" },
+    el("label", {}, "Min distance:"), minDistInput,
+    el("span", { class: "unit" }, "km"),
+    el("button", { onclick: apply }, "Apply"),
+  ));
+
+  const body = el("div", {}, el("div", { class: "empty" }, "Loading rides…"));
+  root.appendChild(body);
+
   let data;
-  try { data = await fetchJson("/api/rides"); }
-  catch (e) {
-    root.innerHTML = "";
-    root.appendChild(el("div", { class: "error" }, `Failed to load rides: ${e.message}`));
+  try {
+    data = await fetchJson(`/api/rides?min_distance_km=${encodeURIComponent(minDist)}`);
+  } catch (e) {
+    body.replaceChildren(el("div", { class: "error" }, `Failed to load rides: ${e.message}`));
     return;
   }
 
-  // no list item
-  root.innerHTML = "";
   if (!data.rides.length) {
-    root.appendChild(el("div", { class: "empty" },
+    body.replaceChildren(el("div", { class: "empty" },
       `No rides match. ${data.total_cached} cached. Run `,
-      el("code", {}, "ride fetch"), " to populate."));
+      el("code", {}, "ride fetch"), " to populate, or lower the minimum distance."));
     return;
   }
 
-  // render list
-  const table = el("table", { class: "rides" },
+  body.replaceChildren(el("table", { class: "rides" },
     el("thead", {}, el("tr", {},
       el("th", { class: "date" }, "Date"),
       el("th", { class: "dist" }, "Distance"),
       el("th", { class: "name" }, "Name"),
     )),
-    el("tbody", {},
-      data.rides.map(r =>
-        el("tr", { class: "row", onclick: () => navigate(r.id) },
-          el("td", { class: "date" }, r.date),
-          el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
-          el("td", { class: "name" }, r.name),
-        )
+    el("tbody", {}, data.rides.map(r =>
+      el("tr", { class: "row", onclick: () => navigate(r.id) },
+        el("td", { class: "date" }, r.date),
+        el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
+        el("td", { class: "name" }, r.name),
       )
-    ),
-  );
-  root.appendChild(table);
+    )),
+  ));
 }
 
 // --- analysis view ------------------------------------------------------
@@ -478,7 +494,7 @@ async function renderAnalysis(rideId, minStop) {
 
   const minStopInput = el("input", { type: "text", value: minStop });
   const apply = () => {
-    const v = minStopInput.value.trim() || "5m";
+    const v = minStopInput.value.trim() || DEFAULT_MIN_STOP;
     navigate(rideId, v);
   };
   minStopInput.addEventListener("keydown", e => { if (e.key === "Enter") apply(); });
@@ -515,14 +531,13 @@ async function renderAnalysis(rideId, minStop) {
 // --- routing ------------------------------------------------------------
 function parseHash() {
   const h = window.location.hash.replace(/^#/, "");
-  if (!h) return { view: "list" };
   const params = new URLSearchParams(h);
   const ride = params.get("ride");
-  if (ride) return { view: "analysis", rideId: ride, minStop: params.get("min_stop") || "5m" };
-  return { view: "list" };
+  if (ride) return { view: "analysis", rideId: ride, minStop: params.get("min_stop") || DEFAULT_MIN_STOP };
+  return { view: "list", minDist: parseMinDist(params.get("min_dist")) };
 }
 
-function navigate(rideId, minStop = "5m") {
+function navigate(rideId, minStop = DEFAULT_MIN_STOP) {
   if (rideId == null) {
     window.location.hash = "";
   } else {
@@ -531,11 +546,16 @@ function navigate(rideId, minStop = "5m") {
   }
 }
 
+function navigateList(minDist) {
+  const p = new URLSearchParams({ min_dist: String(minDist) });
+  window.location.hash = p.toString();
+}
+
 function route() {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
   const r = parseHash();
   if (r.view === "analysis") renderAnalysis(r.rideId, r.minStop);
-  else renderList();
+  else renderList(r.minDist);
 }
 
 window.addEventListener("hashchange", route);
