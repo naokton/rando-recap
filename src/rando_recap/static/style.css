@@ -146,7 +146,8 @@ table.data tr.row:hover { background: var(--bg-soft); }
   border-radius: 0;
 }
 body.map-fullscreen-active { overflow: hidden; }
-.fullscreen-btn {
+.fullscreen-btn,
+.daynight-btn {
   width: 30px; height: 30px;
   line-height: 30px;
   text-align: center;
@@ -155,7 +156,9 @@ body.map-fullscreen-active { overflow: hidden; }
   background: white;
   text-decoration: none;
 }
-.fullscreen-btn:hover { background: var(--bg-soft); }
+.fullscreen-btn:hover,
+.daynight-btn:hover { background: var(--bg-soft); }
+.daynight-btn.off { color: var(--muted); }
 
 .empty, .error { color: var(--muted); padding: 16px 0; }
 .error { color: #b91c1c; }

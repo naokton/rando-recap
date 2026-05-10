@@ -20,6 +20,7 @@ _PAD_PREFIX = " " * LEFT_PAD
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from .app import AnalysisResult
     from .segments import Segment
     from .stops import Control
 
@@ -302,12 +303,9 @@ def render_terminal(
     console.print(Padding(st, _PAD))
 
 
-def build_payload(
-    activity: dict[str, Any],
-    controls: list[Control],
-    segments: list[Segment],
-) -> dict[str, Any]:
-    return {
+def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dict[str, Any]:
+    activity = result.activity
+    payload: dict[str, Any] = {
         "activity": {
             "id": activity.get("id"),
             "name": activity.get("name"),
@@ -319,14 +317,14 @@ def build_payload(
             "moving_time_s": activity.get("moving_time"),
             "total_elevation_gain_m": activity.get("total_elevation_gain"),
         },
-        "controls": [{**asdict(c), "rest_s": c.rest_s} for c in controls],
-        "segments": [asdict(s) for s in segments],
+        "controls": [{**asdict(c), "rest_s": c.rest_s} for c in result.controls],
+        "segments": [asdict(s) for s in result.segments],
+        "daynight": [asdict(s) for s in result.daynight],
     }
+    if include_latlng:
+        payload["latlng"] = result.streams["latlng"]["data"]
+    return payload
 
 
-def render_json(
-    activity: dict[str, Any],
-    controls: list[Control],
-    segments: list[Segment],
-) -> str:
-    return json.dumps(build_payload(activity, controls, segments), indent=2)
+def render_json(result: AnalysisResult) -> str:
+    return json.dumps(build_payload(result, include_latlng=False), indent=2)

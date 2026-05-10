@@ -101,7 +101,7 @@ def analyze(
         raise click.ClickException(str(e)) from e
 
     if json_out:
-        sys.stdout.write(render_json(result.activity, result.controls, result.segments))
+        sys.stdout.write(render_json(result))
         sys.stdout.write("\n")
     else:
         render_terminal(result.activity, result.controls, result.segments)

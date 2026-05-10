@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from platformdirs import user_cache_dir, user_config_dir
 
 from .cache import Cache
+from .daynight import Stretch, build_stretches
 from .segments import Segment, build_segments
 from .stops import Control, detect_controls
 from .strava import StravaClient
@@ -102,6 +103,7 @@ class AnalysisResult:
     streams: dict[str, Any]
     controls: list[Control]
     segments: list[Segment]
+    daynight: list[Stretch]
 
 
 class ActivityNotCachedError(LookupError):
@@ -132,4 +134,9 @@ def analyze_activity(
         min_stop_s=min_stop_s,
     )
     segments = build_segments(streams, controls)
-    return AnalysisResult(activity, streams, controls, segments)
+    daynight = build_stretches(
+        streams,
+        activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
+        utc_offset_s=int(activity.get("utc_offset") or 0),
+    )
+    return AnalysisResult(activity, streams, controls, segments, daynight)

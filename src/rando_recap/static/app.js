@@ -300,17 +300,18 @@ function renderSegmentsTable(segments) {
   );
 }
 
+const DAYNIGHT_COLORS = { day: "#f59e0b", twilight: "#a855f7", night: "#1e3a8a" };
+
 let mapInstance = null;
-function renderMap(container, segments, controls, activity, model) {
+function renderMap(container, latlng, segments, controls, activity, model, daynight) {
   if (mapInstance) { mapInstance.remove(); mapInstance = null; }
-  const segsWithGps = segments.filter(s => s.polyline && s.polyline.length);
-  if (!segsWithGps.length) {
+  if (!latlng || !latlng.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
     return;
   }
-  const firstPt = segsWithGps[0].polyline[0];
-  const lastPts = segsWithGps[segsWithGps.length - 1].polyline;
-  const lastPt = lastPts[lastPts.length - 1];
+  const slice = (lo, hi) => latlng.slice(lo, hi + 1);
+  const firstPt = latlng[0];
+  const lastPt = latlng[latlng.length - 1];
 
   const map = L.map(container).setView(firstPt, 11);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -318,8 +319,20 @@ function renderMap(container, segments, controls, activity, model) {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
-  const segLines = segsWithGps.map(s => {
-    const line = L.polyline(s.polyline, { color: "#047857", weight: 3 }).addTo(map);
+  // Day/night halo: drawn first so segment polylines render on top.
+  const haloStretches = daynight || [];
+  const haloGroup = L.layerGroup(
+    haloStretches.map(s => L.polyline(slice(s.index_start, s.index_end), {
+      color: DAYNIGHT_COLORS[s.state] || "#999",
+      weight: 8,
+      opacity: 0.45,
+      interactive: false,
+    }))
+  );
+  if (haloStretches.length) haloGroup.addTo(map);
+
+  const segLines = segments.map(s => {
+    const line = L.polyline(slice(s.index_start, s.index_end), { color: "#047857", weight: 3 }).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
       line.setStyle({ color: on ? "#0ea5e9" : "#047857", weight: on ? 6 : 3 });
       if (on) line.bringToFront();
@@ -394,19 +407,59 @@ function renderMap(container, segments, controls, activity, model) {
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
+  if (haloStretches.length) addDaynightControl(map, haloGroup);
   mapInstance = map;
 }
 
-function addFullscreenControl(map, container, bounds) {
+function addToggleControl(map, { className, label, title, onClick }) {
   let btn;
+  const Ctrl = L.Control.extend({
+    options: { position: "topleft" },
+    onAdd() {
+      btn = el("a", {
+        class: `leaflet-bar leaflet-control ${className}`,
+        href: "#", title, role: "button",
+      }, label);
+      L.DomEvent.disableClickPropagation(btn);
+      L.DomEvent.disableScrollPropagation(btn);
+      L.DomEvent.on(btn, "click", (e) => { L.DomEvent.preventDefault(e); onClick(btn); });
+      return btn;
+    },
+  });
+  map.addControl(new Ctrl());
+}
+
+function addDaynightControl(map, haloGroup) {
+  let on = true;
+  addToggleControl(map, {
+    className: "daynight-btn",
+    label: "☀",
+    title: "Hide day/night",
+    onClick: (btn) => {
+      on = !on;
+      if (on) {
+        haloGroup.addTo(map);
+        // After re-adding, the halo lands on top — push it behind the segments.
+        haloGroup.eachLayer(layer => layer.bringToBack());
+      } else {
+        map.removeLayer(haloGroup);
+      }
+      btn.classList.toggle("off", !on);
+      btn.title = on ? "Hide day/night" : "Show day/night";
+    },
+  });
+}
+
+function addFullscreenControl(map, container, bounds) {
   let on = false;
   let escHandler = null;
+  let btnRef;
 
   const applyClasses = () => {
     container.classList.toggle("map-fullscreen", on);
     document.body.classList.toggle("map-fullscreen-active", on);
-    btn.innerHTML = on ? "⤡" : "⤢";
-    btn.title = on ? "Exit fullscreen" : "Toggle fullscreen";
+    btnRef.innerHTML = on ? "⤡" : "⤢";
+    btnRef.title = on ? "Exit fullscreen" : "Toggle fullscreen";
   };
 
   const toggle = () => {
@@ -436,22 +489,12 @@ function addFullscreenControl(map, container, bounds) {
     }
   };
 
-  const Ctrl = L.Control.extend({
-    options: { position: "topleft" },
-    onAdd() {
-      btn = el("a", {
-        class: "leaflet-bar leaflet-control fullscreen-btn",
-        href: "#",
-        title: "Toggle fullscreen",
-        role: "button",
-      }, "⤢");
-      L.DomEvent.disableClickPropagation(btn);
-      L.DomEvent.disableScrollPropagation(btn);
-      L.DomEvent.on(btn, "click", (e) => { L.DomEvent.preventDefault(e); toggle(); });
-      return btn;
-    },
+  addToggleControl(map, {
+    className: "fullscreen-btn",
+    label: "⤢",
+    title: "Toggle fullscreen",
+    onClick: (btn) => { btnRef = btn; toggle(); },
   });
-  map.addControl(new Ctrl());
   map.on("unload", cleanup);
 }
 
@@ -503,17 +546,18 @@ async function renderAnalysis(rideId, minStop) {
     el("button", { onclick: apply }, "Apply"),
   ));
 
+  const model = buildTimelineModel(data.controls, data.segments);
+
   // ---------------------
   // Map
   root.appendChild(el("h2", {}, "Map"));
   const mapDiv = el("div", { id: "map" });
   root.appendChild(mapDiv);
   // Leaflet needs the container in the DOM with size before init.
-  setTimeout(() => renderMap(mapDiv, data.segments, data.controls, data.activity, model), 0);
+  setTimeout(() => renderMap(mapDiv, data.latlng, data.segments, data.controls, data.activity, model, data.daynight), 0);
 
   // ---------------------
   // Timeline
-  const model = buildTimelineModel(data.controls, data.segments);
   root.appendChild(renderTimeline(data.activity, data.controls, model));
 
   // ---------------------
