@@ -4,6 +4,11 @@ Per-control and per-segment analysis of randonneuring rides, from Strava
 activity streams. Controls are auto-detected from gaps in the recording (your
 Garmin pauses at stops, leaving gaps in the time stream).
 
+Runs as a local web app: a FastAPI server with a Leaflet-based single-page UI
+that renders a map, timeline, and per-control / per-segment tables, with
+linked hover across all three. The same analysis is also available from the
+CLI.
+
 ## Setup
 
 1. Create a Strava API application: <https://www.strava.com/settings/api>
@@ -21,7 +26,35 @@ Garmin pauses at stops, leaving gaps in the time stream).
    config dir (`~/Library/Application Support/rando-recap/token.json` on
    macOS) and refreshed automatically.
 
-## Usage
+## Web app
+
+```bash
+uv run app serve                       # http://127.0.0.1:8000
+uv run app serve --host 0.0.0.0 --port 8080
+uv run app serve --reload              # dev: auto-reload on code change
+```
+
+Routes:
+
+- `/` — ride list (filtered by minimum distance). Click a ride for the
+  analysis view: map, timeline, controls table, segments table.
+- `/api/rides` — JSON list of cached rides. Query: `min_distance_km`, `types`.
+- `/api/rides/{activity_id}/analysis` — JSON analysis. Query: `min_stop`,
+  `refresh`.
+
+The analysis view shows a route polyline colored by day/night (using sunrise
+/ sunset for the ride's location and date), control markers, and a segment
+timeline. Hovering any peer (table row, timeline bar, map element)
+highlights the others.
+
+UI state lives in the URL hash: `#min_dist=190` on the list, and
+`#ride=<id>&min_stop=5m` on the analysis page — refresh-safe and shareable.
+
+The server is single-user with no auth; bind to `127.0.0.1` unless you know
+what you're doing. Populate the local cache with `uv run app fetch` first
+(see below).
+
+## CLI
 
 ```bash
 uv run app analyze <activity_id>
@@ -32,31 +65,6 @@ uv run app analyze <activity_id> --refresh        # bypass local cache
 
 `<activity_id>` is the integer at the end of a Strava activity URL.
 
-### Bulk-cache rides
-
-`ride fetch` walks your Strava history, filters down to randonneuring rides
-(by `sport_type` and minimum distance), and stashes each match's summary
-metadata locally. Only the listing endpoint is hit (~1 call per 200
-activities, no per-ride detail call) — the summary already carries every
-field `analyze` needs. Streams are still fetched on demand by `analyze`.
-
-```bash
-uv run app fetch                          # last month, ≥190 km, Ride/GravelRide
-uv run app fetch --since all              # first-time full sync
-uv run app fetch --since 6m --min-distance 200
-```
-
-`--since` accepts `Nd` / `Nw` / `Nm` / `Ny` (days/weeks/months/years), `all`,
-or a `YYYY-MM-DD` date. The command is idempotent — already-cached rides are
-skipped — and respects Strava's rate limits (sleeps near the 100-req /
-15-minute cap, retries once on 429, aborts on daily-limit exhaustion).
-
-To see which rides are in the cache (and grab an id for `analyze`):
-
-```bash
-uv run app list
-```
-
 The terminal report shows:
 
 - **Controls** — clock time arriving / departing / dwell, with lat,lng.
@@ -64,27 +72,52 @@ The terminal report shows:
   climb (m), climb m/km. Within a segment elapsed time = moving time, since
   paused intervals only appear at controls.
 
+### Bulk-cache rides
+
+`app fetch` walks your Strava history and stashes each activity's summary
+metadata locally. Only the listing endpoint is hit (~1 call per 200
+activities, no per-ride detail call) — the summary already carries every
+field `analyze` needs. Streams are still fetched on demand by `analyze`.
+
+```bash
+uv run app fetch                          # last month
+uv run app fetch --since all              # first-time full sync
+uv run app fetch --since 6m
+```
+
+`--since` accepts `Nd` / `Nw` / `Nm` / `Ny` (days/weeks/months/years), `all`,
+or a `YYYY-MM-DD` date. The command is idempotent — already-cached rides are
+skipped — and respects Strava's rate limits (sleeps near the 100-req /
+15-minute cap, retries once on 429, aborts on daily-limit exhaustion).
+
+Filtering by sport type and minimum distance happens at list / serve time,
+not at fetch time, so you can change the threshold without re-fetching.
+
+To see which rides are in the cache (and grab an id for `analyze`):
+
+```bash
+uv run app list                                   # ≥190 km, Ride/GravelRide
+uv run app list --min-distance 200 --types Ride
+```
+
 ## Caching
 
 API responses are cached at `~/Library/Caches/rando-recap/cache.db`
 (macOS) so re-runs and threshold tweaks don't re-hit Strava. Pass
-`--refresh` to force a fetch.
-
-## Roadmap
-
-Planned for later iterations (not built yet):
-
-- Stop-time *suggestions* — surface all candidate stops with sliders, let
-  the user accept/reject which count as controls.
-- Map-based manual control selection.
-- Smoothed climb metric (drop GPS noise via altitude hysteresis).
-- Multi-ride comparison (year-over-year, pace decay across distances).
+`--refresh` (CLI) or `?refresh=true` (HTTP API) to force a fetch.
 
 ## Development
 
+Python (ruff + pyrefly + pytest) and JS (oxlint + oxfmt over the static
+frontend) share one Makefile:
+
 ```bash
-make format
-make lint
-make typecheck
+make format      # ruff + oxfmt
+make lint        # ruff + oxlint
+make typecheck   # pyrefly
 uv run pytest
 ```
+
+Requires Python ≥ 3.14. Frontend tooling installs via `npm install`
+(devDependencies only — there's no JS build step; `static/` is served
+as-is, and Leaflet is loaded from a CDN).
