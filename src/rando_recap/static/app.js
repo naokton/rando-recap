@@ -179,7 +179,7 @@ async function renderList(minDist) {
       label: "Min distance:",
       input: minDistInput,
       suffix: el("span", { class: "unit" }, "km"),
-      onApply: () => navigateList(parseMinDist(minDistInput.value)),
+      onApply: () => setHash({ min_dist: String(parseMinDist(minDistInput.value)) }),
     }),
   );
 
@@ -228,7 +228,7 @@ async function renderList(minDist) {
         data.rides.map((r) =>
           el(
             "tr",
-            { class: "row", onclick: () => navigate(r.id) },
+            { class: "row", onclick: () => setHash({ ride: r.id, min_stop: DEFAULT_MIN_STOP }) },
             el("td", { class: "date" }, r.date),
             el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
             el("td", { class: "name" }, r.name),
@@ -784,7 +784,8 @@ async function renderAnalysis(rideId, minStop) {
     controlsRow({
       label: "Min stop:",
       input: minStopInput,
-      onApply: () => navigate(rideId, minStopInput.value.trim() || DEFAULT_MIN_STOP),
+      onApply: () =>
+        setHash({ ride: rideId, min_stop: minStopInput.value.trim() || DEFAULT_MIN_STOP }),
     }),
   );
 
@@ -847,18 +848,8 @@ function parseHash() {
   return { view: "list", minDist: parseMinDist(params.get("min_dist")) };
 }
 
-function navigate(rideId, minStop = DEFAULT_MIN_STOP) {
-  if (rideId == null) {
-    window.location.hash = "";
-  } else {
-    const p = new URLSearchParams({ ride: rideId, min_stop: minStop });
-    window.location.hash = p.toString();
-  }
-}
-
-function navigateList(minDist) {
-  const p = new URLSearchParams({ min_dist: String(minDist) });
-  window.location.hash = p.toString();
+function setHash(params) {
+  window.location.hash = new URLSearchParams(params).toString();
 }
 
 function route() {
