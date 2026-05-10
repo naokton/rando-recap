@@ -238,21 +238,18 @@ function buildTimelineModel(controls, segments) {
   const orderedSegs = segLabels.map((l) => segByLabel[l] ?? null);
   const cumKm = [0];
   for (const s of orderedSegs) cumKm.push(cumKm[cumKm.length - 1] + (s ? s.distance_m / 1000 : 0));
-  return { stopLabels, segLabels, orderedSegs, cumKm };
-}
-
-function endSeconds(controls, orderedSegs) {
-  if (controls.length) {
-    const last = orderedSegs[orderedSegs.length - 1];
-    return controls[controls.length - 1].time_after_s + (last ? last.duration_s : 0);
-  }
-  return orderedSegs[0] ? orderedSegs[0].duration_s : 0;
+  const lastSeg = orderedSegs[orderedSegs.length - 1];
+  const endS = controls.length
+    ? controls[controls.length - 1].time_after_s + (lastSeg ? lastSeg.duration_s : 0)
+    : orderedSegs[0]
+      ? orderedSegs[0].duration_s
+      : 0;
+  return { stopLabels, segLabels, orderedSegs, cumKm, endS };
 }
 
 function renderTimeline(activity, controls, model) {
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
-  const { stopLabels, segLabels, orderedSegs, cumKm } = model;
-  const endS = endSeconds(controls, orderedSegs);
+  const { stopLabels, segLabels, orderedSegs, cumKm, endS } = model;
 
   const wrap = el("div", { class: "timeline-wrap" });
   const grid = el("div", { class: "timeline" });
@@ -543,8 +540,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   }).addTo(map);
 
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
-  const { cumKm, orderedSegs } = model;
-  const endS = endSeconds(controls, orderedSegs);
+  const { cumKm, endS } = model;
   const totalKm = cumKm[cumKm.length - 1].toFixed(1);
 
   const hasDaynight = drawDaynightPath(map, latlng, daynight);
