@@ -147,7 +147,8 @@ table.data tr.row:hover { background: var(--bg-soft); }
 }
 body.map-fullscreen-active { overflow: hidden; }
 .fullscreen-btn,
-.daynight-btn {
+.daynight-btn,
+.controls-btn {
   width: 30px; height: 30px;
   line-height: 30px;
   text-align: center;
@@ -157,8 +158,10 @@ body.map-fullscreen-active { overflow: hidden; }
   text-decoration: none;
 }
 .fullscreen-btn:hover,
-.daynight-btn:hover { background: var(--bg-soft); }
-.daynight-btn.off { color: var(--muted); }
+.daynight-btn:hover,
+.controls-btn:hover { background: var(--bg-soft); }
+.daynight-btn.off,
+.controls-btn.off { color: var(--muted); }
 
 .empty, .error { color: var(--muted); padding: 16px 0; }
 .error { color: #b91c1c; }

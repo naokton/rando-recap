@@ -377,7 +377,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       radius: minR + (maxR - minR) * Math.sqrt((c.rest_s || 0) / maxRest),
     }))
     .sort((a, b) => b.radius - a.radius);
-  ordered.forEach(({ c, i, radius }) => {
+  const controlMarkers = ordered.map(({ c, i, radius }) => {
     const km = cumKm[i + 1].toFixed(1);
     const arrive = fmtClock(c.time_before_s);
     const depart = fmtClock(c.time_after_s);
@@ -387,7 +387,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       weight: 1,
       fillColor: CONTROL_COLOR,
       fillOpacity: 0.2,
-    }).addTo(map).bindTooltip(
+    }).bindTooltip(
       `<b>C${i + 1}</b><br>` +
       `${km} km<br>` +
       `${arrive} → ${depart}<br>` +
@@ -397,7 +397,10 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
     registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
+    return marker;
   });
+  const controlsLayer = L.layerGroup(controlMarkers);
+  if (controlMarkers.length) controlsLayer.addTo(map);
 
   const endMarker = L.marker(lastPt).addTo(map)
     .bindPopup(
@@ -411,6 +414,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
   if (haloStretches.length) addDaynightControl(map, haloGroup);
+  if (controlMarkers.length) addControlsToggle(map, controlsLayer);
   mapInstance = map;
 }
 
@@ -449,6 +453,22 @@ function addDaynightControl(map, haloGroup) {
       }
       btn.classList.toggle("off", !on);
       btn.title = on ? "Hide day/night" : "Show day/night";
+    },
+  });
+}
+
+function addControlsToggle(map, controlsLayer) {
+  let on = true;
+  addToggleControl(map, {
+    className: "controls-btn",
+    label: "●",
+    title: "Hide controls",
+    onClick: (btn) => {
+      on = !on;
+      if (on) controlsLayer.addTo(map);
+      else map.removeLayer(controlsLayer);
+      btn.classList.toggle("off", !on);
+      btn.title = on ? "Hide controls" : "Show controls";
     },
   });
 }
