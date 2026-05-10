@@ -300,10 +300,10 @@ function renderSegmentsTable(segments) {
   );
 }
 
-const SEGMENT_COLOR = "#047857";
+const SEGMENT_COLOR = "#048f67";
 const SEGMENT_HOVER_COLOR = "#0ea5e9";
 const CONTROL_COLOR = "#dc2626";
-const DAYNIGHT_COLORS = { day: "#f59e0b", twilight: "#a855f7", night: "#1e3a8a" };
+const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
 
 let mapInstance = null;
 function renderMap(container, latlng, segments, controls, activity, model, daynight) {
@@ -322,22 +322,32 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
-  // Day/night halo: drawn first so segment polylines render on top.
-  const haloStretches = daynight || [];
-  const haloGroup = L.layerGroup(
-    haloStretches.map(s => L.polyline(slice(s.index_start, s.index_end), {
-      color: DAYNIGHT_COLORS[s.state] || "#999",
-      weight: 8,
-      opacity: 0.45,
-      interactive: false,
-    }))
-  ).addTo(map);
+  // When day/night data is available the path is drawn in day/twilight/night
+  // colors; segment polylines are kept on the map at opacity 0 so they remain
+  // hoverable peers for the linked highlight.
+  const daynightStretches = daynight || [];
+  const hasDaynight = daynightStretches.length > 0;
+  if (hasDaynight) {
+    L.layerGroup(
+      daynightStretches.map(s => L.polyline(slice(s.index_start, s.index_end), {
+        color: DAYNIGHT_COLORS[s.state] || "#999",
+        weight: 3,
+        opacity: 1,
+        interactive: false,
+      }))
+    ).addTo(map);
+  }
 
+  const segBaseStyle = { color: SEGMENT_COLOR, weight: 3, opacity: hasDaynight ? 0 : 1 };
   const segLines = segments.map(s => {
-    const line = L.polyline(slice(s.index_start, s.index_end), { color: SEGMENT_COLOR, weight: 3 }).addTo(map);
+    const line = L.polyline(slice(s.index_start, s.index_end), segBaseStyle).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
-      line.setStyle({ color: on ? SEGMENT_HOVER_COLOR : SEGMENT_COLOR, weight: on ? 6 : 3 });
-      if (on) line.bringToFront();
+      if (on) {
+        line.setStyle({ color: SEGMENT_HOVER_COLOR, weight: 6, opacity: 1 });
+        line.bringToFront();
+      } else {
+        line.setStyle(segBaseStyle);
+      }
     });
     return line;
   });
@@ -411,14 +421,6 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
-  if (haloStretches.length) addLayerToggle(map, haloGroup, {
-    className: "daynight-btn",
-    label: "☀",
-    hideTitle: "Hide day/night",
-    showTitle: "Show day/night",
-    // After re-adding, the halo lands on top — push it behind the segments.
-    onShow: (g) => g.eachLayer(l => l.bringToBack()),
-  });
   if (controlMarkers.length) addLayerToggle(map, controlsLayer, {
     className: "controls-btn",
     label: "●",
@@ -428,7 +430,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   mapInstance = map;
 }
 
-function addLayerToggle(map, layer, { className, label, hideTitle, showTitle, onShow }) {
+function addLayerToggle(map, layer, { className, label, hideTitle, showTitle }) {
   let on = true;
   addToggleControl(map, {
     className,
@@ -436,12 +438,8 @@ function addLayerToggle(map, layer, { className, label, hideTitle, showTitle, on
     title: hideTitle,
     onClick: (btn) => {
       on = !on;
-      if (on) {
-        layer.addTo(map);
-        onShow?.(layer);
-      } else {
-        map.removeLayer(layer);
-      }
+      if (on) layer.addTo(map);
+      else map.removeLayer(layer);
       btn.classList.toggle("off", !on);
       btn.title = on ? hideTitle : showTitle;
     },
