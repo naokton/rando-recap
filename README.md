@@ -84,6 +84,7 @@ Planned for later iterations (not built yet):
 
 ```bash
 make format
+make lint
 make typecheck
 uv run pytest
 ```
