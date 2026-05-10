@@ -331,8 +331,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       opacity: 0.45,
       interactive: false,
     }))
-  );
-  if (haloStretches.length) haloGroup.addTo(map);
+  ).addTo(map);
 
   const segLines = segments.map(s => {
     const line = L.polyline(slice(s.index_start, s.index_end), { color: SEGMENT_COLOR, weight: 3 }).addTo(map);
@@ -399,8 +398,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
     });
     return marker;
   });
-  const controlsLayer = L.layerGroup(controlMarkers);
-  if (controlMarkers.length) controlsLayer.addTo(map);
+  const controlsLayer = L.layerGroup(controlMarkers).addTo(map);
 
   const endMarker = L.marker(lastPt).addTo(map)
     .bindPopup(
@@ -413,9 +411,41 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
-  if (haloStretches.length) addDaynightControl(map, haloGroup);
-  if (controlMarkers.length) addControlsToggle(map, controlsLayer);
+  if (haloStretches.length) addLayerToggle(map, haloGroup, {
+    className: "daynight-btn",
+    label: "☀",
+    hideTitle: "Hide day/night",
+    showTitle: "Show day/night",
+    // After re-adding, the halo lands on top — push it behind the segments.
+    onShow: (g) => g.eachLayer(l => l.bringToBack()),
+  });
+  if (controlMarkers.length) addLayerToggle(map, controlsLayer, {
+    className: "controls-btn",
+    label: "●",
+    hideTitle: "Hide controls",
+    showTitle: "Show controls",
+  });
   mapInstance = map;
+}
+
+function addLayerToggle(map, layer, { className, label, hideTitle, showTitle, onShow }) {
+  let on = true;
+  addToggleControl(map, {
+    className,
+    label,
+    title: hideTitle,
+    onClick: (btn) => {
+      on = !on;
+      if (on) {
+        layer.addTo(map);
+        onShow?.(layer);
+      } else {
+        map.removeLayer(layer);
+      }
+      btn.classList.toggle("off", !on);
+      btn.title = on ? hideTitle : showTitle;
+    },
+  });
 }
 
 function addToggleControl(map, { className, label, title, onClick }) {
@@ -424,7 +454,7 @@ function addToggleControl(map, { className, label, title, onClick }) {
     options: { position: "topleft" },
     onAdd() {
       btn = el("a", {
-        class: `leaflet-bar leaflet-control ${className}`,
+        class: `leaflet-bar leaflet-control map-toggle-btn ${className}`,
         href: "#", title, role: "button",
       }, label);
       L.DomEvent.disableClickPropagation(btn);
@@ -434,43 +464,6 @@ function addToggleControl(map, { className, label, title, onClick }) {
     },
   });
   map.addControl(new Ctrl());
-}
-
-function addDaynightControl(map, haloGroup) {
-  let on = true;
-  addToggleControl(map, {
-    className: "daynight-btn",
-    label: "☀",
-    title: "Hide day/night",
-    onClick: (btn) => {
-      on = !on;
-      if (on) {
-        haloGroup.addTo(map);
-        // After re-adding, the halo lands on top — push it behind the segments.
-        haloGroup.eachLayer(layer => layer.bringToBack());
-      } else {
-        map.removeLayer(haloGroup);
-      }
-      btn.classList.toggle("off", !on);
-      btn.title = on ? "Hide day/night" : "Show day/night";
-    },
-  });
-}
-
-function addControlsToggle(map, controlsLayer) {
-  let on = true;
-  addToggleControl(map, {
-    className: "controls-btn",
-    label: "●",
-    title: "Hide controls",
-    onClick: (btn) => {
-      on = !on;
-      if (on) controlsLayer.addTo(map);
-      else map.removeLayer(controlsLayer);
-      btn.classList.toggle("off", !on);
-      btn.title = on ? "Hide controls" : "Show controls";
-    },
-  });
 }
 
 function addFullscreenControl(map, container, bounds) {
