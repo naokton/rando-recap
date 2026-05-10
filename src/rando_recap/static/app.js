@@ -1,5 +1,18 @@
 const root = document.getElementById("root");
 
+// --- constants ---------------------------------------------------------
+const DEFAULT_MIN_DIST_KM = 190;
+const DEFAULT_MIN_STOP = "5m";
+
+const SEGMENT_COLOR = "#048f67";
+const SEGMENT_HOVER_COLOR = "#0ea5e9";
+const CONTROL_COLOR = "#dc2626";
+const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
+
+const MIN_MAP_HEIGHT_PX = 200;
+const CONTROL_MARKER_MIN_R = 3;
+const CONTROL_MARKER_MAX_R = 40;
+
 function fmtDur(seconds) {
   if (seconds == null) return "-";
   const s = Math.floor(seconds);
@@ -131,9 +144,6 @@ root.addEventListener("mouseout", (e) => {
 });
 
 // --- list view ----------------------------------------------------------
-const DEFAULT_MIN_DIST_KM = 190;
-const DEFAULT_MIN_STOP = "5m";
-
 function parseMinDist(s) {
   const v = parseFloat(s);
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MIN_DIST_KM;
@@ -406,11 +416,6 @@ function renderSegmentsTable(segments) {
   );
 }
 
-const SEGMENT_COLOR = "#048f67";
-const SEGMENT_HOVER_COLOR = "#0ea5e9";
-const CONTROL_COLOR = "#dc2626";
-const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
-
 function drawDaynightPath(map, latlng, daynight) {
   if (!daynight || !daynight.length) return false;
   L.layerGroup(
@@ -461,8 +466,6 @@ function drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS) {
 
 function drawControlMarkers(map, controls, cumKm, fmtClock) {
   const maxRest = Math.max(1, ...controls.map((c) => c.rest_s || 0));
-  const minR = 3,
-    maxR = 40;
   // Render largest circles first so smaller ones land on top — when controls
   // cluster at the same place, the smaller circle stays hoverable instead of
   // being buried under the larger one.
@@ -472,9 +475,11 @@ function drawControlMarkers(map, controls, cumKm, fmtClock) {
       i,
       // Radius scales with sqrt(rest_s / maxRest) so circle *area* is roughly
       // proportional to rest time. Normalizing to maxRest keeps the longest
-      // rest at maxR (so it always fits on the map) while preserving relative
-      // size differences between shorter rests.
-      radius: minR + (maxR - minR) * Math.sqrt((c.rest_s || 0) / maxRest),
+      // rest at the max radius (so it always fits on the map) while preserving
+      // relative size differences between shorter rests.
+      radius:
+        CONTROL_MARKER_MIN_R +
+        (CONTROL_MARKER_MAX_R - CONTROL_MARKER_MIN_R) * Math.sqrt((c.rest_s || 0) / maxRest),
     }))
     .sort((a, b) => b.radius - a.radius);
   const markers = ordered.map(({ c, i, radius }) => {
@@ -498,8 +503,6 @@ function drawControlMarkers(map, controls, cumKm, fmtClock) {
   });
   return L.layerGroup(markers).addTo(map);
 }
-
-const MIN_MAP_HEIGHT_PX = 200;
 
 function attachMapResizer(mapDiv, handle) {
   let startY = 0;
