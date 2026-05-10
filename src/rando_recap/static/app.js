@@ -1,5 +1,4 @@
 const root = document.getElementById("root");
-const crumb = document.getElementById("crumb");
 
 function fmtDur(seconds) {
   if (seconds == null) return "-";
@@ -128,7 +127,6 @@ function parseMinDist(s) {
 }
 
 async function renderList(minDist) {
-  crumb.textContent = "";
   root.innerHTML = "";
 
   // Filter control — rendered first so it stays visible even when no rides match.
@@ -620,8 +618,6 @@ function addFullscreenControl(map, container, bounds) {
 }
 
 async function renderAnalysis(rideId, minStop) {
-  crumb.textContent = `ride ${rideId}`;
-
   // ---------------------
   // Loading
   root.innerHTML = "";
