@@ -3,6 +3,7 @@ const root = document.getElementById("root");
 // --- constants ---------------------------------------------------------
 const DEFAULT_MIN_DIST_KM = 190;
 const DEFAULT_MIN_STOP = "5m";
+const DEFAULT_MERGE_WITHIN_M = "100";
 
 const SEGMENT_COLOR = "#048f67";
 const SEGMENT_HOVER_COLOR = "#0ea5e9";
@@ -166,25 +167,30 @@ root.addEventListener("mouseout", (e) => {
   }
 });
 
-// Labeled input + Apply button row, with Enter binding the same handler.
-function controlsRow({ label, input, suffix, onApply }) {
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") onApply();
-  });
-  return el(
-    "div",
-    { class: "controls-row" },
-    el("label", {}, label),
-    input,
-    suffix ?? null,
-    el("button", { onclick: onApply }, "Apply"),
-  );
+// One or more labeled inputs sharing a single Apply button. Enter on any
+// input triggers the same handler.
+function controlsRow({ fields, onApply }) {
+  const children = [];
+  for (const f of fields) {
+    f.input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") onApply();
+    });
+    children.push(el("label", {}, f.label), f.input);
+    if (f.suffix) children.push(f.suffix);
+  }
+  children.push(el("button", { onclick: onApply }, "Apply"));
+  return el("div", { class: "controls-row" }, ...children);
 }
 
 // --- list view ----------------------------------------------------------
 function parseMinDist(s) {
   const v = parseFloat(s);
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MIN_DIST_KM;
+}
+
+function parseMergeWithin(s) {
+  const v = parseFloat(s);
+  return Number.isFinite(v) && v >= 0 ? v : parseFloat(DEFAULT_MERGE_WITHIN_M);
 }
 
 async function renderList(minDist) {
@@ -199,9 +205,13 @@ async function renderList(minDist) {
   });
   root.appendChild(
     controlsRow({
-      label: "Min distance:",
-      input: minDistInput,
-      suffix: el("span", { class: "unit" }, "km"),
+      fields: [
+        {
+          label: "Min distance:",
+          input: minDistInput,
+          suffix: el("span", { class: "unit" }, "km"),
+        },
+      ],
       onApply: () => setHash({ min_dist: String(parseMinDist(minDistInput.value)) }),
     }),
   );
@@ -260,7 +270,11 @@ async function renderList(minDist) {
               el(
                 "a",
                 {
-                  href: `#${new URLSearchParams({ ride: r.id, min_stop: DEFAULT_MIN_STOP })}`,
+                  href: `#${new URLSearchParams({
+                    ride: r.id,
+                    min_stop: DEFAULT_MIN_STOP,
+                    merge_within_m: DEFAULT_MERGE_WITHIN_M,
+                  })}`,
                 },
                 r.name,
               ),
@@ -876,14 +890,15 @@ function addFullscreenControl(map, container, bounds) {
 }
 
 // --- analysis view -----------------------------------------------------
-async function renderAnalysis(rideId, minStop) {
+async function renderAnalysis(rideId, minStop, mergeWithinM) {
   // ---------------------
   // Loading
   root.innerHTML = "";
   root.appendChild(el("div", { class: "empty" }, "Loading…"));
   let data;
   try {
-    data = await fetchJson(`/api/rides/${rideId}/analysis?min_stop=${encodeURIComponent(minStop)}`);
+    const qs = new URLSearchParams({ min_stop: minStop, merge_within_m: mergeWithinM });
+    data = await fetchJson(`/api/rides/${rideId}/analysis?${qs}`);
   } catch (e) {
     root.innerHTML = "";
     root.appendChild(el("div", { class: "error" }, `Failed to load analysis: ${e.message}`));
@@ -936,12 +951,29 @@ async function renderAnalysis(rideId, minStop) {
   );
 
   const minStopInput = el("input", { type: "text", value: minStop });
+  const mergeWithinInput = el("input", {
+    type: "number",
+    min: "0",
+    step: "10",
+    value: String(mergeWithinM),
+  });
+  const applyForm = () =>
+    setHash({
+      ride: rideId,
+      min_stop: minStopInput.value.trim() || DEFAULT_MIN_STOP,
+      merge_within_m: parseMergeWithin(mergeWithinInput.value),
+    });
   root.appendChild(
     controlsRow({
-      label: "Min stop:",
-      input: minStopInput,
-      onApply: () =>
-        setHash({ ride: rideId, min_stop: minStopInput.value.trim() || DEFAULT_MIN_STOP }),
+      fields: [
+        { label: "Min stop:", input: minStopInput },
+        {
+          label: "Merge within:",
+          input: mergeWithinInput,
+          suffix: el("span", { class: "unit" }, "m"),
+        },
+      ],
+      onApply: applyForm,
     }),
   );
 
@@ -987,7 +1019,12 @@ function parseHash() {
   const params = new URLSearchParams(h);
   const ride = params.get("ride");
   if (ride)
-    return { view: "analysis", rideId: ride, minStop: params.get("min_stop") || DEFAULT_MIN_STOP };
+    return {
+      view: "analysis",
+      rideId: ride,
+      minStop: params.get("min_stop") || DEFAULT_MIN_STOP,
+      mergeWithinM: parseMergeWithin(params.get("merge_within_m")),
+    };
   return { view: "list", minDist: parseMinDist(params.get("min_dist")) };
 }
 
@@ -998,7 +1035,7 @@ function setHash(params) {
 function route() {
   unmountCurrentView();
   const r = parseHash();
-  if (r.view === "analysis") renderAnalysis(r.rideId, r.minStop);
+  if (r.view === "analysis") renderAnalysis(r.rideId, r.minStop, r.mergeWithinM);
   else renderList(r.minDist);
 }
 
