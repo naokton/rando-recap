@@ -63,12 +63,6 @@ table.rides th {
   color: var(--muted);
   font-weight: 500;
 }
-table.rides tr.row {
-  cursor: pointer;
-}
-table.rides tr.row:hover {
-  background: var(--bg-soft);
-}
 table.rides td.dist {
   text-align: right;
 }

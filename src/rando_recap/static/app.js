@@ -251,10 +251,20 @@ async function renderList(minDist) {
         data.rides.map((r) =>
           el(
             "tr",
-            { class: "row", onclick: () => setHash({ ride: r.id, min_stop: DEFAULT_MIN_STOP }) },
+            {},
             el("td", { class: "date" }, r.date),
             el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
-            el("td", { class: "name" }, r.name),
+            el(
+              "td",
+              { class: "name" },
+              el(
+                "a",
+                {
+                  href: `#${new URLSearchParams({ ride: r.id, min_stop: DEFAULT_MIN_STOP })}`,
+                },
+                r.name,
+              ),
+            ),
           ),
         ),
       ),
