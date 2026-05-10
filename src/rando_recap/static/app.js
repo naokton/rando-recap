@@ -486,6 +486,31 @@ function drawControlMarkers(map, controls, cumKm, fmtClock) {
   return L.layerGroup(markers).addTo(map);
 }
 
+const MIN_MAP_HEIGHT_PX = 200;
+
+function attachMapResizer(mapDiv, handle) {
+  let startY = 0;
+  let startH = 0;
+  handle.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("dragging");
+    startY = e.clientY;
+    startH = mapDiv.getBoundingClientRect().height;
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    const h = Math.max(MIN_MAP_HEIGHT_PX, startH + (e.clientY - startY));
+    mapDiv.style.height = `${h}px`;
+  });
+  const release = (e) => {
+    if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
+    handle.classList.remove("dragging");
+  };
+  handle.addEventListener("pointerup", release);
+  handle.addEventListener("pointercancel", release);
+}
+
 let mapInstance = null;
 function renderMap(container, latlng, segments, controls, activity, model, daynight) {
   if (mapInstance) {
@@ -517,6 +542,12 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
 
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
+
+  // Leaflet needs invalidateSize() when the container resizes (drag handle).
+  const ro = new ResizeObserver(() => map.invalidateSize());
+  ro.observe(container);
+  map.on("unload", () => ro.disconnect());
+
   addFullscreenControl(map, container, bounds);
   if (controlsLayer)
     addLayerToggle(map, controlsLayer, {
@@ -707,7 +738,13 @@ async function renderAnalysis(rideId, minStop) {
   // Map
   root.appendChild(el("h2", {}, "Map"));
   const mapDiv = el("div", { id: "map" });
+  const resizeHandle = el("div", {
+    class: "map-resize-handle",
+    title: "Drag to resize map",
+  });
   root.appendChild(mapDiv);
+  root.appendChild(resizeHandle);
+  attachMapResizer(mapDiv, resizeHandle);
   // Leaflet needs the container in the DOM with size before init.
   setTimeout(
     () =>

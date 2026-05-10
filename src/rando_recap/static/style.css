@@ -243,17 +243,45 @@ table.data tr.row:hover {
 /* Map */
 #map {
   height: 480px;
+  min-height: 200px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 4px 4px 0 0;
 }
 #map.map-fullscreen {
   position: fixed !important;
   inset: 0;
-  height: 100vh;
-  width: 100vw;
+  height: 100vh !important;
+  width: 100vw !important;
   z-index: 9999;
   border: 0;
   border-radius: 0;
+}
+.map-resize-handle {
+  height: 10px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+.map-resize-handle::after {
+  content: "";
+  width: 40px;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+.map-resize-handle:hover::after,
+.map-resize-handle.dragging::after {
+  background: var(--muted);
+}
+body.map-fullscreen-active .map-resize-handle {
+  display: none;
 }
 body.map-fullscreen-active {
   overflow: hidden;
