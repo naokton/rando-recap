@@ -3,7 +3,35 @@ const root = document.getElementById("root");
 // --- constants ---------------------------------------------------------
 const DEFAULT_MIN_DIST_KM = 190;
 const DEFAULT_MIN_STOP = "5m";
-const DEFAULT_MERGE_WITHIN_M = "100";
+const DEFAULT_MERGE_WITHIN_M = 100;
+const STORAGE_KEY_USER_PARAMS = "rando-recap.user-params";
+
+// Persisted UI preferences so they survive list → analysis → list navigation
+// and reloads. The URL hash still carries authoritative state when present;
+// these values fill in defaults when params are absent (e.g. on `#`).
+function loadUserParams() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_USER_PARAMS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        return {
+          minDist: parseMinDist(parsed.minDist),
+          minStop: typeof parsed.minStop === "string" && parsed.minStop ? parsed.minStop : DEFAULT_MIN_STOP,
+          mergeWithinM: parseMergeWithin(parsed.mergeWithinM),
+        };
+      }
+    }
+  } catch {}
+  return { minDist: DEFAULT_MIN_DIST_KM, minStop: DEFAULT_MIN_STOP, mergeWithinM: DEFAULT_MERGE_WITHIN_M };
+}
+
+function saveUserParams(partial) {
+  try {
+    const merged = { ...loadUserParams(), ...partial };
+    localStorage.setItem(STORAGE_KEY_USER_PARAMS, JSON.stringify(merged));
+  } catch {}
+}
 
 const SEGMENT_COLOR = "#048f67";
 const SEGMENT_HOVER_COLOR = "#0ea5e9";
@@ -190,10 +218,11 @@ function parseMinDist(s) {
 
 function parseMergeWithin(s) {
   const v = parseFloat(s);
-  return Number.isFinite(v) && v >= 0 ? v : parseFloat(DEFAULT_MERGE_WITHIN_M);
+  return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MERGE_WITHIN_M;
 }
 
 async function renderList(minDist) {
+  saveUserParams({ minDist });
   root.innerHTML = "";
 
   // Filter control — rendered first so it stays visible even when no rides match.
@@ -226,6 +255,8 @@ async function renderList(minDist) {
     body.replaceChildren(el("div", { class: "error" }, `Failed to load rides: ${e.message}`));
     return;
   }
+
+  const { minStop: rideMinStop, mergeWithinM: rideMergeWithin } = loadUserParams();
 
   if (!data.rides.length) {
     body.replaceChildren(
@@ -272,8 +303,8 @@ async function renderList(minDist) {
                 {
                   href: `#${new URLSearchParams({
                     ride: r.id,
-                    min_stop: DEFAULT_MIN_STOP,
-                    merge_within_m: DEFAULT_MERGE_WITHIN_M,
+                    min_stop: rideMinStop,
+                    merge_within_m: rideMergeWithin,
                   })}`,
                 },
                 r.name,
@@ -891,6 +922,7 @@ function addFullscreenControl(map, container, bounds) {
 
 // --- analysis view -----------------------------------------------------
 async function renderAnalysis(rideId, minStop, mergeWithinM) {
+  saveUserParams({ minStop, mergeWithinM });
   // ---------------------
   // Loading
   root.innerHTML = "";
@@ -1015,17 +1047,21 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
 
 // --- routing ------------------------------------------------------------
 function parseHash() {
+  const saved = loadUserParams();
   const h = window.location.hash.replace(/^#/, "");
   const params = new URLSearchParams(h);
   const ride = params.get("ride");
-  if (ride)
+  if (ride) {
+    const mergeParam = params.get("merge_within_m");
     return {
       view: "analysis",
       rideId: ride,
-      minStop: params.get("min_stop") || DEFAULT_MIN_STOP,
-      mergeWithinM: parseMergeWithin(params.get("merge_within_m")),
+      minStop: params.get("min_stop") || saved.minStop,
+      mergeWithinM: mergeParam != null ? parseMergeWithin(mergeParam) : saved.mergeWithinM,
     };
-  return { view: "list", minDist: parseMinDist(params.get("min_dist")) };
+  }
+  const minDistParam = params.get("min_dist");
+  return { view: "list", minDist: minDistParam != null ? parseMinDist(minDistParam) : saved.minDist };
 }
 
 function setHash(params) {
