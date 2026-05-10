@@ -398,73 +398,55 @@ const SEGMENT_HOVER_COLOR = "#0ea5e9";
 const CONTROL_COLOR = "#dc2626";
 const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
 
-let mapInstance = null;
-function renderMap(container, latlng, segments, controls, activity, model, daynight) {
-  if (mapInstance) {
-    mapInstance.remove();
-    mapInstance = null;
-  }
-  if (!latlng || !latlng.length) {
-    container.appendChild(el("div", { class: "empty" }, "No GPS data."));
-    return;
-  }
-  const slice = (lo, hi) => latlng.slice(lo, hi + 1);
-  const firstPt = latlng[0];
-  const lastPt = latlng[latlng.length - 1];
+function drawDaynightPath(map, latlng, daynight) {
+  if (!daynight || !daynight.length) return false;
+  L.layerGroup(
+    daynight.map((s) =>
+      L.polyline(latlng.slice(s.index_start, s.index_end + 1), {
+        color: DAYNIGHT_COLORS[s.state] || "#999",
+        weight: 3,
+        opacity: 1,
+        interactive: false,
+      }),
+    ),
+  ).addTo(map);
+  return true;
+}
 
-  const map = L.map(container).setView(firstPt, 11);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  }).addTo(map);
-
-  // When day/night data is available the path is drawn in day/twilight/night
-  // colors; segment polylines are kept on the map at opacity 0 so they remain
-  // hoverable peers for the linked highlight.
-  const daynightStretches = daynight || [];
-  const hasDaynight = daynightStretches.length > 0;
-  if (hasDaynight) {
-    L.layerGroup(
-      daynightStretches.map((s) =>
-        L.polyline(slice(s.index_start, s.index_end), {
-          color: DAYNIGHT_COLORS[s.state] || "#999",
-          weight: 3,
-          opacity: 1,
-          interactive: false,
-        }),
-      ),
-    ).addTo(map);
-  }
-
-  const segBaseStyle = { color: SEGMENT_COLOR, weight: 3, opacity: hasDaynight ? 0 : 1 };
-  const segLines = segments.map((s) => {
-    const line = L.polyline(slice(s.index_start, s.index_end), segBaseStyle).addTo(map);
+function drawSegmentLines(map, latlng, segments, hasDaynight) {
+  // When day/night colors are drawn, segment lines stay invisible (opacity 0)
+  // but remain on the map so they're still hoverable peers for linked highlight.
+  const baseStyle = { color: SEGMENT_COLOR, weight: 3, opacity: hasDaynight ? 0 : 1 };
+  return segments.map((s) => {
+    const line = L.polyline(latlng.slice(s.index_start, s.index_end + 1), baseStyle).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
       if (on) {
         line.setStyle({ color: SEGMENT_HOVER_COLOR, weight: 6, opacity: 1 });
         line.bringToFront();
       } else {
-        line.setStyle(segBaseStyle);
+        line.setStyle(baseStyle);
       }
     });
     return line;
   });
+}
 
-  const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
-  const { cumKm, orderedSegs } = model;
-  const endS = endSeconds(controls, orderedSegs);
-  const totalKm = cumKm[cumKm.length - 1].toFixed(1);
-
+function drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS) {
   const iconHighlight = (marker) => (on) => {
     const elt = marker.getElement();
     if (elt) elt.classList.toggle("hl-marker", on);
   };
-
-  const startMarker = L.marker(firstPt)
+  const start = L.marker(firstPt)
     .addTo(map)
-    .bindPopup(`<b>Start</b><br>` + `0.0 km<br>` + `${fmtClock(0)}`);
-  registerMapPeer("stop", "start", startMarker, iconHighlight(startMarker));
+    .bindPopup(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`);
+  registerMapPeer("stop", "start", start, iconHighlight(start));
+  const end = L.marker(lastPt)
+    .addTo(map)
+    .bindPopup(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`);
+  registerMapPeer("stop", "end", end, iconHighlight(end));
+}
 
+function drawControlMarkers(map, controls, cumKm, fmtClock) {
   const maxRest = Math.max(1, ...controls.map((c) => c.rest_s || 0));
   const minR = 3,
     maxR = 40;
@@ -482,7 +464,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       radius: minR + (maxR - minR) * Math.sqrt((c.rest_s || 0) / maxRest),
     }))
     .sort((a, b) => b.radius - a.radius);
-  const controlMarkers = ordered.map(({ c, i, radius }) => {
+  const markers = ordered.map(({ c, i, radius }) => {
     const km = cumKm[i + 1].toFixed(1);
     const arrive = fmtClock(c.time_before_s);
     const depart = fmtClock(c.time_after_s);
@@ -492,26 +474,51 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       weight: 1,
       fillColor: CONTROL_COLOR,
       fillOpacity: 0.2,
-    }).bindTooltip(
-      `<b>C${i + 1}</b><br>` + `${km} km<br>` + `${arrive} → ${depart}<br>` + `${fmtDur(c.rest_s)}`,
-      { direction: "top", offset: [0, -4] },
-    );
+    }).bindTooltip(`<b>C${i + 1}</b><br>${km} km<br>${arrive} → ${depart}<br>${fmtDur(c.rest_s)}`, {
+      direction: "top",
+      offset: [0, -4],
+    });
     registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
     return marker;
   });
-  const controlsLayer = L.layerGroup(controlMarkers).addTo(map);
+  return L.layerGroup(markers).addTo(map);
+}
 
-  const endMarker = L.marker(lastPt)
-    .addTo(map)
-    .bindPopup(`<b>End</b><br>` + `${totalKm} km<br>` + `${fmtClock(endS)}`);
-  registerMapPeer("stop", "end", endMarker, iconHighlight(endMarker));
+let mapInstance = null;
+function renderMap(container, latlng, segments, controls, activity, model, daynight) {
+  if (mapInstance) {
+    mapInstance.remove();
+    mapInstance = null;
+  }
+  if (!latlng || !latlng.length) {
+    container.appendChild(el("div", { class: "empty" }, "No GPS data."));
+    return;
+  }
+  const firstPt = latlng[0];
+  const lastPt = latlng[latlng.length - 1];
+
+  const map = L.map(container).setView(firstPt, 11);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+
+  const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
+  const { cumKm, orderedSegs } = model;
+  const endS = endSeconds(controls, orderedSegs);
+  const totalKm = cumKm[cumKm.length - 1].toFixed(1);
+
+  const hasDaynight = drawDaynightPath(map, latlng, daynight);
+  const segLines = drawSegmentLines(map, latlng, segments, hasDaynight);
+  drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS);
+  const controlsLayer = controls.length ? drawControlMarkers(map, controls, cumKm, fmtClock) : null;
 
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
   addFullscreenControl(map, container, bounds);
-  if (controlMarkers.length)
+  if (controlsLayer)
     addLayerToggle(map, controlsLayer, {
       className: "controls-btn",
       label: "●",
