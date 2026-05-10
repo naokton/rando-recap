@@ -239,7 +239,7 @@ async function renderList(minDist) {
   );
 }
 
-// --- analysis view ------------------------------------------------------
+// --- timeline ----------------------------------------------------------
 function buildTimelineModel(controls, segments) {
   const stopLabels = ["Start", ...controls.map((_, i) => `C${i + 1}`), "End"];
   const segByLabel = Object.fromEntries(segments.map((s) => [s.label, s]));
@@ -340,6 +340,7 @@ function renderTimeline(activity, controls, model) {
   return wrap;
 }
 
+// --- tables ------------------------------------------------------------
 function renderControlsTable(activity, controls, cumKm) {
   if (!controls.length) {
     return el("div", { class: "empty" }, "No stops above threshold detected.");
@@ -422,6 +423,7 @@ function renderSegmentsTable(segments) {
   );
 }
 
+// --- map ---------------------------------------------------------------
 function drawDaynightPath(map, latlng, daynight) {
   if (!daynight || !daynight.length) return false;
   L.layerGroup(
@@ -577,6 +579,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   mapInstance = map;
 }
 
+// --- map controls ------------------------------------------------------
 // Wraps addToggleControl with on/off state plus label/title swapping.
 // Returns setOn(next) so callers (e.g. an Esc handler) can drive state too.
 function addStatefulButton(
@@ -717,6 +720,7 @@ function addFullscreenControl(map, container, bounds) {
   });
 }
 
+// --- analysis view -----------------------------------------------------
 async function renderAnalysis(rideId, minStop) {
   // ---------------------
   // Loading
