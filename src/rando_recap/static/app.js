@@ -12,6 +12,10 @@ const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b
 const MIN_MAP_HEIGHT_PX = 200;
 const CONTROL_MARKER_MIN_R = 3;
 const CONTROL_MARKER_MAX_R = 40;
+// On out-and-back routes the turnaround usually has a control on it; if one
+// is within this distance of the auto-detected farthest point, the split
+// snaps to it so the two halves align with the timeline / tables.
+const SPLIT_SNAP_THRESHOLD_M = 1000;
 
 function fmtDur(seconds) {
   if (seconds == null) return "-";
@@ -59,6 +63,54 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Split the route at the GPS point farthest from the start. If a control's
+// location is within SPLIT_SNAP_THRESHOLD_M of that point, snap to it so the
+// halves align with the timeline / tables. Returns null when the track is
+// too short to split.
+function autoSplitInfo(latlng, controls) {
+  if (!latlng || latlng.length < 2) return null;
+  const [lat0, lng0] = latlng[0];
+  let farthestIdx = 0;
+  let farthestDist = 0;
+  for (let i = 1; i < latlng.length; i++) {
+    const [lat, lng] = latlng[i];
+    const d = haversineMeters(lat0, lng0, lat, lng);
+    if (d > farthestDist) {
+      farthestDist = d;
+      farthestIdx = i;
+    }
+  }
+  const [latF, lngF] = latlng[farthestIdx];
+  let snapIdx = -1;
+  let snapDist = SPLIT_SNAP_THRESHOLD_M;
+  for (let k = 0; k < controls.length; k++) {
+    const c = controls[k];
+    const d = haversineMeters(latF, lngF, c.lat, c.lng);
+    if (d < snapDist) {
+      snapDist = d;
+      snapIdx = k;
+    }
+  }
+  if (snapIdx >= 0) return splitInfoForControl(controls, snapIdx);
+  return { beforeIdx: farthestIdx, afterIdx: farthestIdx, controlIdx: null };
+}
+
+function splitInfoForControl(controls, idx) {
+  const c = controls[idx];
+  return { beforeIdx: c.index_before, afterIdx: c.index_after, controlIdx: idx };
+}
+
 async function fetchJson(url) {
   const r = await fetch(url);
   if (!r.ok) {
@@ -73,9 +125,9 @@ async function fetchJson(url) {
 }
 
 // --- view lifecycle ----------------------------------------------------
-// renderAnalysis sets module-level state (link, mapInstance) that must be
-// torn down before the next view mounts. Routing the cleanup through one
-// hook keeps the two from drifting out of sync.
+// renderAnalysis sets module-level state (link) and owns a map-area
+// controller that must be torn down before the next view mounts. Routing
+// the cleanup through one hook keeps the two from drifting out of sync.
 let currentView = null;
 
 function unmountCurrentView() {
@@ -91,6 +143,10 @@ function unmountCurrentView() {
 // (stops: "start" / "end" / "c<i>"; segments: the label string). Map peers
 // (stop markers and segment polylines) register a highlight callback in
 // link.<kind>.peers via registerMapPeer.
+//
+// peers is keyed by (stop/seg) key with an array of fns: in split-map mode
+// the same segment can appear on both halves (the spanning segment) and the
+// snap control's marker is shown on both maps, so a key may have >1 peer.
 let link = null;
 const HOVER_KINDS = ["stop", "seg"];
 
@@ -102,9 +158,19 @@ function makeLink() {
 }
 
 function registerMapPeer(kind, key, source, applyHighlight) {
-  link[kind].peers.set(key, applyHighlight);
+  let arr = link[kind].peers.get(key);
+  if (!arr) {
+    arr = [];
+    link[kind].peers.set(key, arr);
+  }
+  arr.push(applyHighlight);
   source.on("mouseover", () => setHover(kind, key));
   source.on("mouseout", () => setHover(kind, null));
+}
+
+function clearMapPeers() {
+  if (!link) return;
+  for (const kind of HOVER_KINDS) link[kind].peers.clear();
 }
 
 function applyHover(kind, key) {
@@ -114,8 +180,8 @@ function applyHover(kind, key) {
   root
     .querySelectorAll(`[data-${kind}="${CSS.escape(key)}"]`)
     .forEach((el) => el.classList.toggle("hl", active));
-  const m = k.peers.get(key);
-  if (m) m(active);
+  const arr = k.peers.get(key);
+  if (arr) for (const fn of arr) fn(active);
 }
 
 function setHover(kind, key) {
@@ -424,27 +490,42 @@ function renderSegmentsTable(segments) {
 }
 
 // --- map ---------------------------------------------------------------
-function drawDaynightPath(map, latlng, daynight) {
+// Clip a chunk's [index_start, index_end] to range; returns [a, b] or null.
+function clipToRange(chunk, range) {
+  const a = Math.max(chunk.index_start, range.startIdx);
+  const b = Math.min(chunk.index_end, range.endIdx);
+  return a <= b ? [a, b] : null;
+}
+
+function drawDaynightPath(map, latlng, daynight, range) {
   if (!daynight || !daynight.length) return false;
-  L.layerGroup(
-    daynight.map((s) =>
-      L.polyline(latlng.slice(s.index_start, s.index_end + 1), {
+  const lines = [];
+  for (const s of daynight) {
+    const clip = clipToRange(s, range);
+    if (!clip) continue;
+    lines.push(
+      L.polyline(latlng.slice(clip[0], clip[1] + 1), {
         color: DAYNIGHT_COLORS[s.state] || "#999",
         weight: 3,
         opacity: 1,
         interactive: false,
       }),
-    ),
-  ).addTo(map);
+    );
+  }
+  if (!lines.length) return false;
+  L.layerGroup(lines).addTo(map);
   return true;
 }
 
-function drawSegmentLines(map, latlng, segments, hasDaynight) {
+function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
   // When day/night colors are drawn, segment lines stay invisible (opacity 0)
   // but remain on the map so they're still hoverable peers for linked highlight.
   const baseStyle = { color: SEGMENT_COLOR, weight: 3, opacity: hasDaynight ? 0 : 1 };
-  return segments.map((s) => {
-    const line = L.polyline(latlng.slice(s.index_start, s.index_end + 1), baseStyle).addTo(map);
+  const lines = [];
+  for (const s of segments) {
+    const clip = clipToRange(s, range);
+    if (!clip) continue;
+    const line = L.polyline(latlng.slice(clip[0], clip[1] + 1), baseStyle).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
       if (on) {
         line.setStyle({ color: SEGMENT_HOVER_COLOR, weight: 6, opacity: 1 });
@@ -453,32 +534,52 @@ function drawSegmentLines(map, latlng, segments, hasDaynight) {
         line.setStyle(baseStyle);
       }
     });
-    return line;
-  });
+    lines.push(line);
+  }
+  return lines;
 }
 
-function drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS) {
+function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
+  // Only draw the global Start/End markers when the map's range actually
+  // reaches the track ends; on the inner side of a split there's no
+  // dedicated split marker — the polyline simply ends.
+  const last = latlng.length - 1;
   const iconHighlight = (marker) => (on) => {
     const elt = marker.getElement();
     if (elt) elt.classList.toggle("hl-marker", on);
   };
-  const start = L.marker(firstPt)
-    .addTo(map)
-    .bindPopup(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`);
-  registerMapPeer("stop", "start", start, iconHighlight(start));
-  const end = L.marker(lastPt)
-    .addTo(map)
-    .bindPopup(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`);
-  registerMapPeer("stop", "end", end, iconHighlight(end));
+  if (range.startIdx === 0) {
+    const start = L.marker(latlng[0])
+      .addTo(map)
+      .bindPopup(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`);
+    registerMapPeer("stop", "start", start, iconHighlight(start));
+  }
+  if (range.endIdx === last) {
+    const end = L.marker(latlng[last])
+      .addTo(map)
+      .bindPopup(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`);
+    registerMapPeer("stop", "end", end, iconHighlight(end));
+  }
 }
 
-function drawControlMarkers(map, controls, cumKm, fmtClock) {
+function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, onClickControl) {
+  // Snap control is shown on both halves so the turnaround anchors visibly on each map.
+  const visible = controls
+    .map((c, i) => ({ c, i }))
+    .filter(({ c, i }) => {
+      const inRange = c.index_before >= range.startIdx && c.index_before <= range.endIdx;
+      const isSnap = splitInfo && splitInfo.controlIdx === i;
+      return inRange || isSnap;
+    });
+  if (!visible.length) return null;
+  // Radius normalization uses the global maxRest so marker sizes are
+  // comparable across the two split maps, not just within a half.
   const maxRest = Math.max(1, ...controls.map((c) => c.rest_s || 0));
   // Render largest circles first so smaller ones land on top — when controls
   // cluster at the same place, the smaller circle stays hoverable instead of
   // being buried under the larger one.
-  const ordered = controls
-    .map((c, i) => ({
+  const ordered = visible
+    .map(({ c, i }) => ({
       c,
       i,
       // Radius scales with sqrt(rest_s / maxRest) so circle *area* is roughly
@@ -507,6 +608,7 @@ function drawControlMarkers(map, controls, cumKm, fmtClock) {
     registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
+    if (onClickControl) marker.on("click", () => onClickControl(i));
     return marker;
   });
   return L.layerGroup(markers).addTo(map);
@@ -535,16 +637,20 @@ function attachMapResizer(mapDiv, handle) {
   handle.addEventListener("pointercancel", release);
 }
 
-let mapInstance = null;
-function renderMap(container, latlng, segments, controls, activity, model, daynight) {
+function renderMap(container, data, model, range, ctx) {
+  const { latlng, segments, controls, daynight, activity } = data;
   if (!latlng || !latlng.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
-    return;
+    return null;
   }
-  const firstPt = latlng[0];
-  const lastPt = latlng[latlng.length - 1];
+  const a = range.startIdx;
+  const b = range.endIdx;
+  if (a > b || a >= latlng.length) {
+    container.appendChild(el("div", { class: "empty" }, "Empty range."));
+    return null;
+  }
 
-  const map = L.map(container).setView(firstPt, 11);
+  const map = L.map(container).setView(latlng[a], 11);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -554,13 +660,23 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   const { cumKm, endS } = model;
   const totalKm = cumKm[cumKm.length - 1].toFixed(1);
 
-  const hasDaynight = drawDaynightPath(map, latlng, daynight);
-  const segLines = drawSegmentLines(map, latlng, segments, hasDaynight);
-  drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS);
-  const controlsLayer = controls.length ? drawControlMarkers(map, controls, cumKm, fmtClock) : null;
-  if (hasDaynight) addMapLegend(map, controls.length > 0);
+  const hasDaynight = drawDaynightPath(map, latlng, daynight, range);
+  const segLines = drawSegmentLines(map, latlng, segments, hasDaynight, range);
+  drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS);
+  const controlsLayer = drawControlMarkers(
+    map,
+    controls,
+    cumKm,
+    fmtClock,
+    range,
+    ctx.splitInfo,
+    ctx.onClickControl,
+  );
+  if (hasDaynight) addMapLegend(map, !!controlsLayer);
 
-  const bounds = L.featureGroup(segLines).getBounds();
+  const bounds = segLines.length
+    ? L.featureGroup(segLines).getBounds()
+    : L.latLngBounds(latlng.slice(a, b + 1));
   map.fitBounds(bounds, { padding: [20, 20] });
 
   // Leaflet needs invalidateSize() when the container resizes (drag handle).
@@ -576,7 +692,81 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
       hideTitle: "Hide controls",
       showTitle: "Show controls",
     });
-  mapInstance = map;
+  if (ctx.onSplitToggle)
+    addStatefulButton(map, {
+      className: "split-btn",
+      labelOn: "⇆",
+      titleOn: "Merge into single map",
+      titleOff: "Split route into outbound / return",
+      initialOn: !!ctx.splitInfo,
+      onChange: (on) => ctx.onSplitToggle(on),
+    });
+  return map;
+}
+
+function buildMapArea(wrapper, data, model) {
+  let splitInfo = null; // null = single-map mode
+  let cachedAuto = null; // memoize the O(N) farthest-point scan across toggles
+  let maps = [];
+
+  const teardown = () => {
+    for (const m of maps) m.remove();
+    maps = [];
+    clearMapPeers();
+  };
+
+  const onSplitToggle = (on) => {
+    if (on) {
+      if (!cachedAuto) cachedAuto = autoSplitInfo(data.latlng, data.controls);
+      if (!cachedAuto) return;
+      splitInfo = cachedAuto;
+    } else {
+      splitInfo = null;
+    }
+    render();
+  };
+
+  const onClickControl = (i) => {
+    if (!splitInfo || splitInfo.controlIdx === i) return;
+    splitInfo = splitInfoForControl(data.controls, i);
+    render();
+  };
+
+  const render = () => {
+    teardown();
+    wrapper.innerHTML = "";
+    const last = data.latlng.length - 1;
+    // The toggle lives on the left map only; the right gets click-to-relocate
+    // but no redundant toggle button.
+    const panes = splitInfo
+      ? [
+          {
+            range: { startIdx: 0, endIdx: splitInfo.beforeIdx },
+            ctx: { splitInfo, onSplitToggle, onClickControl },
+          },
+          {
+            range: { startIdx: splitInfo.afterIdx, endIdx: last },
+            ctx: { splitInfo, onClickControl },
+          },
+        ]
+      : [{ range: { startIdx: 0, endIdx: last }, ctx: { splitInfo: null, onSplitToggle } }];
+    wrapper.classList.toggle("split", !!splitInfo);
+    const inners = panes.map(() => {
+      const d = el("div", { class: "leaflet-map" });
+      wrapper.appendChild(d);
+      return d;
+    });
+    // Leaflet needs the container in the DOM with size before init.
+    setTimeout(() => {
+      panes.forEach((p, i) => {
+        const m = renderMap(inners[i], data, model, p.range, p.ctx);
+        if (m) maps.push(m);
+      });
+    }, 0);
+  };
+
+  render();
+  return { destroy: teardown };
 }
 
 // --- map controls ------------------------------------------------------
@@ -736,11 +926,12 @@ async function renderAnalysis(rideId, minStop) {
   }
   root.innerHTML = "";
   link = makeLink();
+  let mapArea = null;
   currentView = {
     unmount: () => {
-      if (mapInstance) {
-        mapInstance.remove();
-        mapInstance = null;
+      if (mapArea) {
+        mapArea.destroy();
+        mapArea = null;
       }
       link = null;
     },
@@ -802,20 +993,7 @@ async function renderAnalysis(rideId, minStop) {
   root.appendChild(mapDiv);
   root.appendChild(resizeHandle);
   attachMapResizer(mapDiv, resizeHandle);
-  // Leaflet needs the container in the DOM with size before init.
-  setTimeout(
-    () =>
-      renderMap(
-        mapDiv,
-        data.latlng,
-        data.segments,
-        data.controls,
-        data.activity,
-        model,
-        data.daynight,
-      ),
-    0,
-  );
+  mapArea = buildMapArea(mapDiv, data, model);
 
   // ---------------------
   // Timeline

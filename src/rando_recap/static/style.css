@@ -244,10 +244,18 @@ table.data tr.row:hover {
 #map {
   height: 480px;
   min-height: 200px;
-  border: 1px solid var(--border);
+  display: flex;
+  gap: 4px;
   border-radius: 4px 4px 0 0;
+  overflow: hidden;
 }
-#map.map-fullscreen {
+#map .leaflet-map {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 1px solid var(--border);
+}
+.leaflet-map.map-fullscreen {
   position: fixed !important;
   inset: 0;
   height: 100vh !important;
