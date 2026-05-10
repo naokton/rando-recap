@@ -9,6 +9,8 @@ that renders a map, timeline, and per-control / per-segment tables, with
 linked hover across all three. The same analysis is also available from the
 CLI.
 
+![Screenshot](imgs/image.jpg)
+
 ## Setup
 
 1. Create a Strava API application: <https://www.strava.com/settings/api>
