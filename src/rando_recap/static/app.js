@@ -12,10 +12,6 @@ const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b
 const MIN_MAP_HEIGHT_PX = 200;
 const CONTROL_MARKER_MIN_R = 3;
 const CONTROL_MARKER_MAX_R = 40;
-// On out-and-back routes the turnaround usually has a control on it; if one
-// is within this distance of the auto-detected farthest point, the split
-// snaps to it so the two halves align with the timeline / tables.
-const SPLIT_SNAP_THRESHOLD_M = 1000;
 
 function fmtDur(seconds) {
   if (seconds == null) return "-";
@@ -63,52 +59,13 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
-function haversineMeters(lat1, lng1, lat2, lng2) {
-  const R = 6371000;
-  const toRad = (d) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-// Split the route at the GPS point farthest from the start. If a control's
-// location is within SPLIT_SNAP_THRESHOLD_M of that point, snap to it so the
-// halves align with the timeline / tables. Returns null when the track is
-// too short to split.
-function autoSplitInfo(latlng, controls) {
-  if (!latlng || latlng.length < 2) return null;
-  const [lat0, lng0] = latlng[0];
-  let farthestIdx = 0;
-  let farthestDist = 0;
-  for (let i = 1; i < latlng.length; i++) {
-    const [lat, lng] = latlng[i];
-    const d = haversineMeters(lat0, lng0, lat, lng);
-    if (d > farthestDist) {
-      farthestDist = d;
-      farthestIdx = i;
-    }
-  }
-  const [latF, lngF] = latlng[farthestIdx];
-  let snapIdx = -1;
-  let snapDist = SPLIT_SNAP_THRESHOLD_M;
-  for (let k = 0; k < controls.length; k++) {
-    const c = controls[k];
-    const d = haversineMeters(latF, lngF, c.lat, c.lng);
-    if (d < snapDist) {
-      snapDist = d;
-      snapIdx = k;
-    }
-  }
-  if (snapIdx >= 0) return splitInfoForControl(controls, snapIdx);
-  return { beforeIdx: farthestIdx, afterIdx: farthestIdx, controlIdx: null };
-}
-
 function splitInfoForControl(controls, idx) {
   const c = controls[idx];
   return { beforeIdx: c.index_before, afterIdx: c.index_after, controlIdx: idx };
+}
+
+function splitInfoFromTurnaround(t) {
+  return { beforeIdx: t.index_before, afterIdx: t.index_after, controlIdx: t.control_idx };
 }
 
 async function fetchJson(url) {
@@ -705,8 +662,10 @@ function renderMap(container, data, model, range, ctx) {
 }
 
 function buildMapArea(wrapper, data, model) {
+  // Backend omits `turnaround` for routes that don't look out-and-back; the
+  // toggle button is hidden in that case.
+  const autoSplit = data.turnaround ? splitInfoFromTurnaround(data.turnaround) : null;
   let splitInfo = null; // null = single-map mode
-  let cachedAuto = null; // memoize the O(N) farthest-point scan across toggles
   let maps = [];
 
   const teardown = () => {
@@ -715,16 +674,12 @@ function buildMapArea(wrapper, data, model) {
     clearMapPeers();
   };
 
-  const onSplitToggle = (on) => {
-    if (on) {
-      if (!cachedAuto) cachedAuto = autoSplitInfo(data.latlng, data.controls);
-      if (!cachedAuto) return;
-      splitInfo = cachedAuto;
-    } else {
-      splitInfo = null;
-    }
-    render();
-  };
+  const onSplitToggle =
+    autoSplit &&
+    ((on) => {
+      splitInfo = on ? autoSplit : null;
+      render();
+    });
 
   const onClickControl = (i) => {
     if (!splitInfo || splitInfo.controlIdx === i) return;

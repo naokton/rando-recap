@@ -17,6 +17,7 @@ from .daynight import Stretch, build_stretches
 from .segments import Segment, build_segments
 from .stops import Control, detect_controls
 from .strava import StravaClient
+from .turnaround import Turnaround, detect_turnaround
 
 APP_NAME = "rando-recap"
 
@@ -104,6 +105,7 @@ class AnalysisResult:
     controls: list[Control]
     segments: list[Segment]
     daynight: list[Stretch]
+    turnaround: Turnaround | None
 
 
 class ActivityNotCachedError(LookupError):
@@ -139,4 +141,5 @@ def analyze_activity(
         activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
         utc_offset_s=int(activity.get("utc_offset") or 0),
     )
-    return AnalysisResult(activity, streams, controls, segments, daynight)
+    turnaround = detect_turnaround(streams["latlng"]["data"], controls)
+    return AnalysisResult(activity, streams, controls, segments, daynight, turnaround)
