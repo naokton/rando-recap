@@ -15,7 +15,7 @@ from platformdirs import user_cache_dir, user_config_dir
 from .cache import Cache
 from .daynight import Stretch, build_stretches
 from .segments import Segment, build_segments
-from .stops import Control, detect_controls
+from .stops import Control, detect_controls, merge_nearby_controls
 from .strava import StravaClient
 from .turnaround import Turnaround, detect_turnaround
 
@@ -119,8 +119,9 @@ class MissingStreamsError(ValueError):
 def analyze_activity(
     sclient: StravaClient,
     activity_id: int,
-    min_stop_s: int,
     *,
+    min_stop_s: int,
+    merge_within_m: float,
     refresh: bool,
 ) -> AnalysisResult:
     """Auth is the caller's job. Raises ActivityNotCachedError, MissingStreamsError, or StravaScopeError."""
@@ -134,6 +135,11 @@ def analyze_activity(
         time_s=streams["time"]["data"],
         latlng=streams["latlng"]["data"],
         min_stop_s=min_stop_s,
+    )
+    controls = merge_nearby_controls(
+        controls,
+        distance_m=streams["distance"]["data"],
+        merge_within_m=merge_within_m,
     )
     segments = build_segments(streams, controls)
     daynight = build_stretches(

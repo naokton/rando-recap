@@ -73,6 +73,14 @@ def login() -> None:
     show_default=True,
     help="Stops at least this long are treated as controls. e.g. 5m, 300s, 1h.",
 )
+@click.option(
+    "--merge-within",
+    "merge_within_m",
+    type=float,
+    default=100.0,
+    show_default=True,
+    help="Adjacent controls within this path distance (meters) are merged. 0 disables.",
+)
 @click.option("--refresh", is_flag=True, help="Re-fetch streams even if cached.")
 @click.option(
     "--json",
@@ -83,6 +91,7 @@ def login() -> None:
 def analyze(
     activity_id: int,
     min_stop: str,
+    merge_within_m: float,
     refresh: bool,
     json_out: bool,
 ) -> None:
@@ -96,7 +105,13 @@ def analyze(
         raise click.BadParameter(str(e)) from e
 
     try:
-        result = analyze_activity(sclient, activity_id, min_stop_s, refresh=refresh)
+        result = analyze_activity(
+            sclient,
+            activity_id,
+            min_stop_s=min_stop_s,
+            merge_within_m=merge_within_m,
+            refresh=refresh,
+        )
     except (ActivityNotCachedError, MissingStreamsError, StravaScopeError) as e:
         raise click.ClickException(str(e)) from e
 

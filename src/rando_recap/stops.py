@@ -7,7 +7,7 @@ stream has gaps where the device was paused. A stop is therefore a gap
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass
@@ -53,3 +53,26 @@ def detect_controls(
                 )
             )
     return controls
+
+
+def merge_nearby_controls(
+    controls: list[Control],
+    distance_m: list[float],
+    merge_within_m: float,
+) -> list[Control]:
+    """Coalesce adjacent controls within `merge_within_m` of path distance.
+
+    Path distance (not straight-line) so an out-and-back to the same store
+    stays as two controls — only stops linked by a short in-area walk merge.
+    """
+    if not controls or merge_within_m <= 0:
+        return list(controls)
+    merged: list[Control] = [controls[0]]
+    for c in controls[1:]:
+        prev = merged[-1]
+        gap_m = distance_m[c.index_before] - distance_m[prev.index_after]
+        if gap_m <= merge_within_m:
+            merged[-1] = replace(prev, index_after=c.index_after, time_after_s=c.time_after_s)
+        else:
+            merged.append(c)
+    return merged

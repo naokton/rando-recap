@@ -53,6 +53,7 @@ def list_rides(
 def analyze_ride(
     activity_id: int,
     min_stop: str = Query("5m"),
+    merge_within_m: float = Query(100.0, ge=0),
     refresh: bool = Query(False),
 ) -> dict[str, Any]:
     try:
@@ -68,7 +69,13 @@ def analyze_ride(
         raise HTTPException(status_code=401, detail="Not authenticated. Run `ride login` first.")
 
     try:
-        result = analyze_activity(c, activity_id, min_stop_s, refresh=refresh)
+        result = analyze_activity(
+            c,
+            activity_id,
+            min_stop_s=min_stop_s,
+            merge_within_m=merge_within_m,
+            refresh=refresh,
+        )
     except ActivityNotCachedError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except MissingStreamsError as e:
