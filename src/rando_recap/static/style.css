@@ -302,6 +302,30 @@ body.map-fullscreen-active {
 .map-toggle-btn.off {
   color: var(--muted);
 }
+.map-legend {
+  background: white;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+}
+.map-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.map-legend .swatch-line {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+}
+.map-legend .swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid;
+  margin: 0 3px;
+}
 
 .empty,
 .error {

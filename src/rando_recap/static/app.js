@@ -539,6 +539,7 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   const segLines = drawSegmentLines(map, latlng, segments, hasDaynight);
   drawEndpointMarkers(map, firstPt, lastPt, fmtClock, totalKm, endS);
   const controlsLayer = controls.length ? drawControlMarkers(map, controls, cumKm, fmtClock) : null;
+  if (hasDaynight) addMapLegend(map, controls.length > 0);
 
   const bounds = L.featureGroup(segLines).getBounds();
   map.fitBounds(bounds, { padding: [20, 20] });
@@ -597,6 +598,39 @@ function addToggleControl(map, { className, label, title, onClick }) {
         onClick(btn);
       });
       return btn;
+    },
+  });
+  map.addControl(new Ctrl());
+}
+
+function addMapLegend(map, hasControls) {
+  const Ctrl = L.Control.extend({
+    options: { position: "bottomright" },
+    onAdd() {
+      const items = Object.entries(DAYNIGHT_COLORS).map(([state, color]) =>
+        el(
+          "div",
+          { class: "legend-item" },
+          el("span", { class: "swatch-line", style: `background:${color}` }),
+          el("span", {}, state),
+        ),
+      );
+      if (hasControls) {
+        items.push(
+          el(
+            "div",
+            { class: "legend-item" },
+            el("span", {
+              class: "swatch-dot",
+              style: `background:${CONTROL_COLOR}33;border-color:${CONTROL_COLOR}`,
+            }),
+            el("span", {}, "stop"),
+          ),
+        );
+      }
+      const div = el("div", { class: "leaflet-bar leaflet-control map-legend" }, ...items);
+      L.DomEvent.disableClickPropagation(div);
+      return div;
     },
   });
   map.addControl(new Ctrl());
