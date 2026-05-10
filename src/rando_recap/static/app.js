@@ -958,7 +958,6 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
 
   // ---------------------
   // Map
-  root.appendChild(el("h2", {}, "Map"));
   const mapDiv = el("div", { id: "map" });
   const resizeHandle = el("div", {
     class: "map-resize-handle",
