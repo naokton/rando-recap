@@ -734,33 +734,23 @@ async function renderAnalysis(rideId, minStop) {
     ),
   );
 
+  const summaryItems = [
+    ["Distance", `${(a.distance_m / 1000).toFixed(1)} km`],
+    ["Elapsed", fmtDur(a.elapsed_time_s)],
+    ["Moving", fmtDur(a.moving_time_s)],
+    ["Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`],
+  ];
   root.appendChild(
     el(
       "div",
       { class: "summary" },
-      el(
-        "div",
-        { class: "item" },
-        el("span", { class: "label" }, "Distance:"),
-        el("span", { class: "value" }, `${(a.distance_m / 1000).toFixed(1)} km`),
-      ),
-      el(
-        "div",
-        { class: "item" },
-        el("span", { class: "label" }, "Elapsed:"),
-        el("span", { class: "value" }, fmtDur(a.elapsed_time_s)),
-      ),
-      el(
-        "div",
-        { class: "item" },
-        el("span", { class: "label" }, "Moving:"),
-        el("span", { class: "value" }, fmtDur(a.moving_time_s)),
-      ),
-      el(
-        "div",
-        { class: "item" },
-        el("span", { class: "label" }, "Climb:"),
-        el("span", { class: "value" }, `${Math.round(a.total_elevation_gain_m || 0)} m`),
+      summaryItems.map(([label, value]) =>
+        el(
+          "div",
+          { class: "item" },
+          el("span", { class: "label" }, `${label}:`),
+          el("span", { class: "value" }, value),
+        ),
       ),
     ),
   );
