@@ -143,6 +143,21 @@ root.addEventListener("mouseout", (e) => {
   }
 });
 
+// Labeled input + Apply button row, with Enter binding the same handler.
+function controlsRow({ label, input, suffix, onApply }) {
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") onApply();
+  });
+  return el(
+    "div",
+    { class: "controls-row" },
+    el("label", {}, label),
+    input,
+    suffix ?? null,
+    el("button", { onclick: onApply }, "Apply"),
+  );
+}
+
 // --- list view ----------------------------------------------------------
 function parseMinDist(s) {
   const v = parseFloat(s);
@@ -159,19 +174,13 @@ async function renderList(minDist) {
     step: "10",
     value: String(minDist),
   });
-  const apply = () => navigateList(parseMinDist(minDistInput.value));
-  minDistInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") apply();
-  });
   root.appendChild(
-    el(
-      "div",
-      { class: "controls-row" },
-      el("label", {}, "Min distance:"),
-      minDistInput,
-      el("span", { class: "unit" }, "km"),
-      el("button", { onclick: apply }, "Apply"),
-    ),
+    controlsRow({
+      label: "Min distance:",
+      input: minDistInput,
+      suffix: el("span", { class: "unit" }, "km"),
+      onApply: () => navigateList(parseMinDist(minDistInput.value)),
+    }),
   );
 
   const body = el("div", {}, el("div", { class: "empty" }, "Loading rides…"));
@@ -756,21 +765,12 @@ async function renderAnalysis(rideId, minStop) {
   );
 
   const minStopInput = el("input", { type: "text", value: minStop });
-  const apply = () => {
-    const v = minStopInput.value.trim() || DEFAULT_MIN_STOP;
-    navigate(rideId, v);
-  };
-  minStopInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") apply();
-  });
   root.appendChild(
-    el(
-      "div",
-      { class: "controls-row" },
-      el("label", {}, "Min stop:"),
-      minStopInput,
-      el("button", { onclick: apply }, "Apply"),
-    ),
+    controlsRow({
+      label: "Min stop:",
+      input: minStopInput,
+      onApply: () => navigate(rideId, minStopInput.value.trim() || DEFAULT_MIN_STOP),
+    }),
   );
 
   const model = buildTimelineModel(data.controls, data.segments);
