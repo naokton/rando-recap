@@ -577,18 +577,47 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   mapInstance = map;
 }
 
-function addLayerToggle(map, layer, { className, label, hideTitle, showTitle }) {
-  let on = true;
+// Wraps addToggleControl with on/off state plus label/title swapping.
+// Returns setOn(next) so callers (e.g. an Esc handler) can drive state too.
+function addStatefulButton(
+  map,
+  { className, labelOn, labelOff, titleOn, titleOff, initialOn = false, onChange },
+) {
+  let on = initialOn;
+  let btnRef = null;
+  const render = (b) => {
+    b.innerHTML = on ? labelOn : (labelOff ?? labelOn);
+    b.title = on ? titleOn : titleOff;
+  };
+  const setOn = (next) => {
+    if (next === on) return;
+    on = next;
+    if (btnRef) render(btnRef);
+    onChange(on, btnRef);
+  };
   addToggleControl(map, {
     className,
-    label,
-    title: hideTitle,
+    label: on ? labelOn : (labelOff ?? labelOn),
+    title: on ? titleOn : titleOff,
     onClick: (btn) => {
-      on = !on;
+      btnRef = btn;
+      setOn(!on);
+    },
+  });
+  return setOn;
+}
+
+function addLayerToggle(map, layer, { className, label, hideTitle, showTitle }) {
+  addStatefulButton(map, {
+    className,
+    labelOn: label,
+    titleOn: hideTitle,
+    titleOff: showTitle,
+    initialOn: true,
+    onChange: (on, btn) => {
       if (on) layer.addTo(map);
       else map.removeLayer(layer);
       btn.classList.toggle("off", !on);
-      btn.title = on ? hideTitle : showTitle;
     },
   });
 }
@@ -654,56 +683,38 @@ function addMapLegend(map, hasControls) {
 }
 
 function addFullscreenControl(map, container, bounds) {
-  let on = false;
   let escHandler = null;
-  let btnRef;
-
-  const applyClasses = () => {
-    container.classList.toggle("map-fullscreen", on);
-    document.body.classList.toggle("map-fullscreen-active", on);
-    btnRef.innerHTML = on ? "⤡" : "⤢";
-    btnRef.title = on ? "Exit fullscreen" : "Toggle fullscreen";
-  };
-
-  const toggle = () => {
-    on = !on;
-    if (on) {
-      escHandler = (e) => {
-        if (e.key === "Escape") toggle();
-      };
-      document.addEventListener("keydown", escHandler);
-    } else if (escHandler) {
-      document.removeEventListener("keydown", escHandler);
-      escHandler = null;
-    }
-    applyClasses();
-    setTimeout(() => {
-      map.invalidateSize();
-      map.fitBounds(bounds, { padding: [20, 20] });
-    }, 0);
-  };
-
-  const cleanup = () => {
+  const setOn = addStatefulButton(map, {
+    className: "fullscreen-btn",
+    labelOn: "⤡",
+    labelOff: "⤢",
+    titleOn: "Exit fullscreen",
+    titleOff: "Toggle fullscreen",
+    onChange: (on) => {
+      container.classList.toggle("map-fullscreen", on);
+      document.body.classList.toggle("map-fullscreen-active", on);
+      if (on) {
+        escHandler = (e) => {
+          if (e.key === "Escape") setOn(false);
+        };
+        document.addEventListener("keydown", escHandler);
+      } else if (escHandler) {
+        document.removeEventListener("keydown", escHandler);
+        escHandler = null;
+      }
+      setTimeout(() => {
+        map.invalidateSize();
+        map.fitBounds(bounds, { padding: [20, 20] });
+      }, 0);
+    },
+  });
+  map.on("unload", () => {
     if (escHandler) {
       document.removeEventListener("keydown", escHandler);
       escHandler = null;
     }
-    if (on) {
-      on = false;
-      applyClasses();
-    }
-  };
-
-  addToggleControl(map, {
-    className: "fullscreen-btn",
-    label: "⤢",
-    title: "Toggle fullscreen",
-    onClick: (btn) => {
-      btnRef = btn;
-      toggle();
-    },
+    document.body.classList.remove("map-fullscreen-active");
   });
-  map.on("unload", cleanup);
 }
 
 async function renderAnalysis(rideId, minStop) {
