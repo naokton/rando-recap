@@ -300,6 +300,9 @@ function renderSegmentsTable(segments) {
   );
 }
 
+const SEGMENT_COLOR = "#047857";
+const SEGMENT_HOVER_COLOR = "#0ea5e9";
+const CONTROL_COLOR = "#dc2626";
 const DAYNIGHT_COLORS = { day: "#f59e0b", twilight: "#a855f7", night: "#1e3a8a" };
 
 let mapInstance = null;
@@ -332,9 +335,9 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
   if (haloStretches.length) haloGroup.addTo(map);
 
   const segLines = segments.map(s => {
-    const line = L.polyline(slice(s.index_start, s.index_end), { color: "#047857", weight: 3 }).addTo(map);
+    const line = L.polyline(slice(s.index_start, s.index_end), { color: SEGMENT_COLOR, weight: 3 }).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
-      line.setStyle({ color: on ? "#0ea5e9" : "#047857", weight: on ? 6 : 3 });
+      line.setStyle({ color: on ? SEGMENT_HOVER_COLOR : SEGMENT_COLOR, weight: on ? 6 : 3 });
       if (on) line.bringToFront();
     });
     return line;
@@ -380,9 +383,9 @@ function renderMap(container, latlng, segments, controls, activity, model, dayni
     const depart = fmtClock(c.time_after_s);
     const marker = L.circleMarker([c.lat, c.lng], {
       radius,
-      color: "#dc2626",
+      color: CONTROL_COLOR,
       weight: 1,
-      fillColor: "#dc2626",
+      fillColor: CONTROL_COLOR,
       fillOpacity: 0.2,
     }).addTo(map).bindTooltip(
       `<b>C${i + 1}</b><br>` +
