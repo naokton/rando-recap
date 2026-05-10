@@ -59,6 +59,19 @@ async function fetchJson(url) {
   return r.json();
 }
 
+// --- view lifecycle ----------------------------------------------------
+// renderAnalysis sets module-level state (link, mapInstance) that must be
+// torn down before the next view mounts. Routing the cleanup through one
+// hook keeps the two from drifting out of sync.
+let currentView = null;
+
+function unmountCurrentView() {
+  if (currentView) {
+    currentView.unmount();
+    currentView = null;
+  }
+}
+
 // --- linked hover/highlight --------------------------------------------
 // Stops and segments appear on the map, timeline, and tables. Hovering one
 // peer highlights the others. DOM peers carry data-stop / data-seg keys
@@ -513,10 +526,6 @@ function attachMapResizer(mapDiv, handle) {
 
 let mapInstance = null;
 function renderMap(container, latlng, segments, controls, activity, model, daynight) {
-  if (mapInstance) {
-    mapInstance.remove();
-    mapInstance = null;
-  }
   if (!latlng || !latlng.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
     return;
@@ -704,6 +713,15 @@ async function renderAnalysis(rideId, minStop) {
   }
   root.innerHTML = "";
   link = makeLink();
+  currentView = {
+    unmount: () => {
+      if (mapInstance) {
+        mapInstance.remove();
+        mapInstance = null;
+      }
+      link = null;
+    },
+  };
 
   // ---------------------
   // Title & Info
@@ -840,10 +858,7 @@ function navigateList(minDist) {
 }
 
 function route() {
-  if (mapInstance) {
-    mapInstance.remove();
-    mapInstance = null;
-  }
+  unmountCurrentView();
   const r = parseHash();
   if (r.view === "analysis") renderAnalysis(r.rideId, r.minStop);
   else renderList(r.minDist);
