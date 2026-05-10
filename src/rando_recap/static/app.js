@@ -17,13 +17,20 @@ function loadUserParams() {
       if (parsed && typeof parsed === "object") {
         return {
           minDist: parseMinDist(parsed.minDist),
-          minStop: typeof parsed.minStop === "string" && parsed.minStop ? parsed.minStop : DEFAULT_MIN_STOP,
+          minStop:
+            typeof parsed.minStop === "string" && parsed.minStop
+              ? parsed.minStop
+              : DEFAULT_MIN_STOP,
           mergeWithinM: parseMergeWithin(parsed.mergeWithinM),
         };
       }
     }
   } catch {}
-  return { minDist: DEFAULT_MIN_DIST_KM, minStop: DEFAULT_MIN_STOP, mergeWithinM: DEFAULT_MERGE_WITHIN_M };
+  return {
+    minDist: DEFAULT_MIN_DIST_KM,
+    minStop: DEFAULT_MIN_STOP,
+    mergeWithinM: DEFAULT_MERGE_WITHIN_M,
+  };
 }
 
 function saveUserParams(partial) {
@@ -195,21 +202,6 @@ root.addEventListener("mouseout", (e) => {
   }
 });
 
-// One or more labeled inputs sharing a single Apply button. Enter on any
-// input triggers the same handler.
-function controlsRow({ fields, onApply }) {
-  const children = [];
-  for (const f of fields) {
-    f.input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") onApply();
-    });
-    children.push(el("label", {}, f.label), f.input);
-    if (f.suffix) children.push(f.suffix);
-  }
-  children.push(el("button", { onclick: onApply }, "Apply"));
-  return el("div", { class: "controls-row" }, ...children);
-}
-
 // --- list view ----------------------------------------------------------
 function parseMinDist(s) {
   const v = parseFloat(s);
@@ -224,26 +216,6 @@ function parseMergeWithin(s) {
 async function renderList(minDist) {
   saveUserParams({ minDist });
   root.innerHTML = "";
-
-  // Filter control — rendered first so it stays visible even when no rides match.
-  const minDistInput = el("input", {
-    type: "number",
-    min: "0",
-    step: "10",
-    value: String(minDist),
-  });
-  root.appendChild(
-    controlsRow({
-      fields: [
-        {
-          label: "Min distance:",
-          input: minDistInput,
-          suffix: el("span", { class: "unit" }, "km"),
-        },
-      ],
-      onApply: () => setHash({ min_dist: String(parseMinDist(minDistInput.value)) }),
-    }),
-  );
 
   const body = el("div", {}, el("div", { class: "empty" }, "Loading rides…"));
   root.appendChild(body);
@@ -982,33 +954,6 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     ),
   );
 
-  const minStopInput = el("input", { type: "text", value: minStop });
-  const mergeWithinInput = el("input", {
-    type: "number",
-    min: "0",
-    step: "10",
-    value: String(mergeWithinM),
-  });
-  const applyForm = () =>
-    setHash({
-      ride: rideId,
-      min_stop: minStopInput.value.trim() || DEFAULT_MIN_STOP,
-      merge_within_m: parseMergeWithin(mergeWithinInput.value),
-    });
-  root.appendChild(
-    controlsRow({
-      fields: [
-        { label: "Min stop:", input: minStopInput },
-        {
-          label: "Merge within:",
-          input: mergeWithinInput,
-          suffix: el("span", { class: "unit" }, "m"),
-        },
-      ],
-      onApply: applyForm,
-    }),
-  );
-
   const model = buildTimelineModel(data.controls, data.segments);
 
   // ---------------------
@@ -1061,7 +1006,10 @@ function parseHash() {
     };
   }
   const minDistParam = params.get("min_dist");
-  return { view: "list", minDist: minDistParam != null ? parseMinDist(minDistParam) : saved.minDist };
+  return {
+    view: "list",
+    minDist: minDistParam != null ? parseMinDist(minDistParam) : saved.minDist,
+  };
 }
 
 function setHash(params) {
@@ -1077,3 +1025,44 @@ function route() {
 
 window.addEventListener("hashchange", route);
 route();
+
+// --- config dialog ------------------------------------------------------
+(function setupConfigDialog() {
+  const dialog = document.getElementById("config-dialog");
+  const form = document.getElementById("config-form");
+  const minDistInput = document.getElementById("cfg-min-dist");
+  const minStopInput = document.getElementById("cfg-min-stop");
+  const mergeInput = document.getElementById("cfg-merge");
+
+  document.getElementById("config-btn").addEventListener("click", () => {
+    const saved = loadUserParams();
+    minDistInput.value = saved.minDist;
+    minStopInput.value = saved.minStop;
+    mergeInput.value = saved.mergeWithinM;
+    dialog.showModal();
+  });
+
+  document.getElementById("cfg-cancel").addEventListener("click", () => dialog.close());
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const minDist = parseMinDist(minDistInput.value);
+    const minStop = minStopInput.value.trim() || DEFAULT_MIN_STOP;
+    const mergeWithinM = parseMergeWithin(mergeInput.value);
+
+    // Capture currently-rendered params *before* saving so we can detect
+    // whether the change actually affects this view — settings for the
+    // other view get persisted but should not trigger a re-fetch here.
+    const before = parseHash();
+    saveUserParams({ minDist, minStop, mergeWithinM });
+    dialog.close();
+
+    if (before.view === "analysis") {
+      if (before.minStop !== minStop || before.mergeWithinM !== mergeWithinM) {
+        setHash({ ride: before.rideId, min_stop: minStop, merge_within_m: mergeWithinM });
+      }
+    } else if (before.minDist !== minDist) {
+      setHash({ min_dist: minDist });
+    }
+  });
+})();

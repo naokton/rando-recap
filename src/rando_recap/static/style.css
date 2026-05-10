@@ -3,6 +3,8 @@
   --muted: #6b7280;
   --border: #e5e7eb;
   --accent: #047857;
+  --accent-hover: #036648;
+  --bg: white;
   --bg-soft: #f9fafb;
   --track: #111827;
 }
@@ -18,13 +20,13 @@ body {
     Roboto,
     sans-serif;
   color: var(--fg);
-  background: white;
+  background: var(--bg);
 }
 header {
   padding: 14px 24px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
 }
 header h1 {
@@ -39,8 +41,115 @@ header a {
 header a:hover {
   text-decoration: underline;
 }
+.config-btn {
+  margin-left: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 44px;
+  height: 44px;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.config-btn:hover {
+  background: var(--bg-soft);
+  color: var(--accent);
+}
 main {
   padding: 16px 24px 32px;
+}
+
+/* Config dialog */
+#config-dialog {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0;
+  max-width: 420px;
+  width: 100%;
+  color: var(--fg);
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+#config-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.3);
+}
+#config-dialog form {
+  margin: 0;
+}
+#config-dialog .dlg-header {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+#config-dialog .dlg-header h2 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+  font-weight: 600;
+}
+#config-dialog .dlg-body {
+  padding: 6px 20px;
+}
+#config-dialog .field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+#config-dialog .field:last-child {
+  border-bottom: none;
+}
+#config-dialog .field label {
+  color: var(--muted);
+  flex: 0 0 110px;
+}
+#config-dialog .field input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+#config-dialog .field .unit {
+  color: var(--muted);
+  width: 1.4em;
+}
+#config-dialog .dlg-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-soft);
+  border-radius: 0 0 8px 8px;
+}
+#config-dialog .btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  color: var(--fg);
+}
+#config-dialog .btn:hover {
+  background: var(--bg-soft);
+}
+#config-dialog .btn.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+#config-dialog .btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 /* List view */
@@ -96,38 +205,6 @@ table.rides td.dist {
 .summary .value {
   font-weight: 600;
   font-size: 18px;
-}
-
-.controls-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 12px 0 24px;
-}
-.controls-row label {
-  color: var(--muted);
-}
-.controls-row .unit {
-  color: var(--muted);
-  margin-left: -6px;
-}
-.controls-row input[type="text"],
-.controls-row input[type="number"] {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  font: inherit;
-}
-.controls-row button {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.controls-row button:hover {
-  background: var(--bg-soft);
 }
 
 /* Timeline */
@@ -295,7 +372,7 @@ body.map-fullscreen-active {
   text-align: center;
   font-size: 18px;
   color: var(--fg);
-  background: white;
+  background: var(--bg);
   text-decoration: none;
 }
 .map-toggle-btn:hover {
@@ -305,7 +382,7 @@ body.map-fullscreen-active {
   color: var(--muted);
 }
 .map-legend {
-  background: white;
+  background: var(--bg);
   padding: 6px 8px;
   font-size: 12px;
   line-height: 1.5;
