@@ -100,10 +100,6 @@ function splitInfoForControl(controls, idx) {
   return { beforeIdx: c.index_before, afterIdx: c.index_after, controlIdx: idx };
 }
 
-function splitInfoFromTurnaround(t) {
-  return { beforeIdx: t.index_before, afterIdx: t.index_after, controlIdx: t.control_idx };
-}
-
 async function fetchJson(url) {
   const r = await fetch(url);
   if (!r.ok) {
@@ -473,6 +469,64 @@ function renderSegmentsTable(segments) {
   );
 }
 
+// --- marker context menu ----------------------------------------------
+// Lightweight native-style context menu shown at the cursor on right-click.
+// Only one menu can be open at a time; closes on outside click, Escape, or
+// scroll/resize (positions go stale).
+let activeMarkerMenu = null;
+
+function closeMarkerMenu() {
+  if (activeMarkerMenu) {
+    activeMarkerMenu.teardown();
+    activeMarkerMenu = null;
+  }
+}
+
+function openMarkerMenu(originalEvent, items) {
+  closeMarkerMenu();
+  const menu = el("div", { class: "marker-menu" });
+  for (const { label, onSelect } of items) {
+    const item = el("div", { class: "marker-menu-item" }, label);
+    item.addEventListener("click", () => {
+      closeMarkerMenu();
+      onSelect();
+    });
+    menu.appendChild(item);
+  }
+  document.body.appendChild(menu);
+
+  // Clamp into the viewport so the menu never overflows off-screen.
+  const rect = menu.getBoundingClientRect();
+  const x = Math.max(0, Math.min(originalEvent.clientX, window.innerWidth - rect.width - 4));
+  const y = Math.max(0, Math.min(originalEvent.clientY, window.innerHeight - rect.height - 4));
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  const onDocDown = (e) => {
+    if (!menu.contains(e.target)) closeMarkerMenu();
+  };
+  const onKey = (e) => {
+    if (e.key === "Escape") closeMarkerMenu();
+  };
+  const onMove = () => closeMarkerMenu();
+  // Defer the outside-click binding so the same right-click that opened the
+  // menu doesn't immediately close it.
+  setTimeout(() => document.addEventListener("mousedown", onDocDown, true), 0);
+  document.addEventListener("keydown", onKey);
+  window.addEventListener("resize", onMove);
+  window.addEventListener("scroll", onMove, true);
+
+  activeMarkerMenu = {
+    teardown: () => {
+      document.removeEventListener("mousedown", onDocDown, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onMove);
+      window.removeEventListener("scroll", onMove, true);
+      menu.remove();
+    },
+  };
+}
+
 // --- map ---------------------------------------------------------------
 // Clip a chunk's [index_start, index_end] to range; returns [a, b] or null.
 function clipToRange(chunk, range) {
@@ -547,7 +601,7 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
 }
 
 function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, onClickControl) {
-  // Snap control is shown on both halves so the turnaround anchors visibly on each map.
+  // The split control is shown on both halves so it anchors visibly on each map.
   const visible = controls
     .map((c, i) => ({ c, i }))
     .filter(({ c, i }) => {
@@ -592,7 +646,14 @@ function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, on
     registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
-    if (onClickControl) marker.on("click", () => onClickControl(i));
+    if (onClickControl) {
+      marker.on("contextmenu", (ev) => {
+        L.DomEvent.preventDefault(ev.originalEvent);
+        if (splitInfo && splitInfo.controlIdx === i) return;
+        const label = splitInfo ? "Move split here" : "Split here";
+        openMarkerMenu(ev.originalEvent, [{ label, onSelect: () => onClickControl(i) }]);
+      });
+    }
     return marker;
   });
   return L.layerGroup(markers).addTo(map);
@@ -676,41 +737,39 @@ function renderMap(container, data, model, range, ctx) {
       hideTitle: "Hide controls",
       showTitle: "Show controls",
     });
-  if (ctx.onSplitToggle)
-    addStatefulButton(map, {
-      className: "split-btn",
-      labelOn: "⇆",
-      titleOn: "Merge into single map",
-      titleOff: "Split route into outbound / return",
-      initialOn: !!ctx.splitInfo,
-      onChange: (on) => ctx.onSplitToggle(on),
+  if (ctx.onMerge)
+    addToggleControl(map, {
+      className: "merge-btn",
+      label: "✕",
+      title: "Close split view",
+      onClick: () => ctx.onMerge(),
+      position: "topright",
     });
   return map;
 }
 
 function buildMapArea(wrapper, data, model) {
-  // Backend omits `turnaround` for routes that don't look out-and-back; the
-  // toggle button is hidden in that case.
-  const autoSplit = data.turnaround ? splitInfoFromTurnaround(data.turnaround) : null;
   let splitInfo = null; // null = single-map mode
   let maps = [];
 
   const teardown = () => {
+    closeMarkerMenu();
     for (const m of maps) m.remove();
     maps = [];
     clearMapPeers();
   };
 
-  const onSplitToggle =
-    autoSplit &&
-    ((on) => {
-      splitInfo = on ? autoSplit : null;
-      render();
-    });
-
+  // Right-click menu on a control marker drives splitting: it both opens
+  // a route at a chosen control (pre-split) and relocates the split point
+  // (post-split). Merging is done via the close button on the right pane.
   const onClickControl = (i) => {
-    if (!splitInfo || splitInfo.controlIdx === i) return;
+    if (splitInfo && splitInfo.controlIdx === i) return;
     splitInfo = splitInfoForControl(data.controls, i);
+    render();
+  };
+
+  const onMerge = () => {
+    splitInfo = null;
     render();
   };
 
@@ -718,20 +777,24 @@ function buildMapArea(wrapper, data, model) {
     teardown();
     wrapper.innerHTML = "";
     const last = data.latlng.length - 1;
-    // The toggle lives on the left map only; the right gets click-to-relocate
-    // but no redundant toggle button.
+    // Close button sits on the right pane; the left has no merge control.
     const panes = splitInfo
       ? [
           {
             range: { startIdx: 0, endIdx: splitInfo.beforeIdx },
-            ctx: { splitInfo, onSplitToggle, onClickControl },
+            ctx: { splitInfo, onClickControl },
           },
           {
             range: { startIdx: splitInfo.afterIdx, endIdx: last },
-            ctx: { splitInfo, onClickControl },
+            ctx: { splitInfo, onClickControl, onMerge },
           },
         ]
-      : [{ range: { startIdx: 0, endIdx: last }, ctx: { splitInfo: null, onSplitToggle } }];
+      : [
+          {
+            range: { startIdx: 0, endIdx: last },
+            ctx: { splitInfo: null, onClickControl },
+          },
+        ];
     wrapper.classList.toggle("split", !!splitInfo);
     const inners = panes.map(() => {
       const d = el("div", { class: "leaflet-map" });
@@ -761,8 +824,12 @@ function addStatefulButton(
   let on = initialOn;
   let btnRef = null;
   const render = (b) => {
-    b.innerHTML = on ? labelOn : (labelOff ?? labelOn);
-    b.title = on ? titleOn : titleOff;
+    const span = b.querySelector("span");
+    const txt = on ? labelOn : (labelOff ?? labelOn);
+    if (span) span.textContent = txt;
+    const t = on ? titleOn : titleOff;
+    b.title = t;
+    b.setAttribute("aria-label", t);
   };
   const setOn = (next) => {
     if (next === on) return;
@@ -797,28 +864,30 @@ function addLayerToggle(map, layer, { className, label, hideTitle, showTitle }) 
   });
 }
 
-function addToggleControl(map, { className, label, title, onClick }) {
+function addToggleControl(map, { className, label, title, onClick, position = "topleft" }) {
   let btn;
   const Ctrl = L.Control.extend({
-    options: { position: "topleft" },
+    options: { position },
     onAdd() {
       btn = el(
         "a",
         {
-          class: `leaflet-bar leaflet-control map-toggle-btn ${className}`,
+          class: `map-toggle-btn ${className}`,
           href: "#",
           title,
           role: "button",
+          "aria-label": title,
         },
-        label,
+        el("span", { "aria-hidden": "true" }, label),
       );
-      L.DomEvent.disableClickPropagation(btn);
-      L.DomEvent.disableScrollPropagation(btn);
+      const wrapper = el("div", { class: "leaflet-bar leaflet-control" }, btn);
+      L.DomEvent.disableClickPropagation(wrapper);
+      L.DomEvent.disableScrollPropagation(wrapper);
       L.DomEvent.on(btn, "click", (e) => {
         L.DomEvent.preventDefault(e);
         onClick(btn);
       });
-      return btn;
+      return wrapper;
     },
   });
   map.addControl(new Ctrl());
@@ -861,8 +930,8 @@ function addFullscreenControl(map, container, bounds) {
   let escHandler = null;
   const setOn = addStatefulButton(map, {
     className: "fullscreen-btn",
-    labelOn: "⤡",
-    labelOff: "⤢",
+    labelOn: "⇱",
+    labelOff: "⛶",
     titleOn: "Exit fullscreen",
     titleOff: "Toggle fullscreen",
     onChange: (on) => {
