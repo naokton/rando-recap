@@ -265,7 +265,7 @@ async function renderList(minDist) {
           el(
             "tr",
             {},
-            el("td", { class: "date" }, r.date),
+            el("td", { class: "date" }, (r.datetime || "").slice(0, 10)),
             el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
             el(
               "td",

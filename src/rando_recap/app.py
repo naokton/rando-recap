@@ -60,14 +60,14 @@ def parse_duration(value: str) -> int:
 
 @dataclass(frozen=True)
 class Summary:
-    date: str
+    datetime: str
     distance_km: float
     name: str
 
     @classmethod
     def from_activity(cls, activity: dict[str, Any]) -> Summary:
         return cls(
-            date=(activity.get("start_date_local") or activity.get("start_date") or "")[:10],
+            datetime=activity.get("start_date_local") or activity.get("start_date") or "",
             distance_km=float(activity.get("distance") or 0) / 1000,
             name=activity.get("name", ""),
         )
@@ -94,7 +94,7 @@ def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int,
         if not matches_filter(activity, allowed_types, min_distance_m):
             continue
         rows.append((sid, Summary.from_activity(activity)))
-    rows.sort(key=lambda r: r[1].date, reverse=True)
+    rows.sort(key=lambda r: r[1].datetime, reverse=True)
     return total, rows
 
 

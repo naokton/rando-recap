@@ -143,7 +143,7 @@ def fetch(since: str, refresh: bool) -> None:
             seen += 1
             sid = int(activity["id"])
             summary = Summary.from_activity(activity)
-            label = f"{summary.date}  {summary.distance_km:6.1f} km  {summary.name}"
+            label = f"{summary.datetime[:10]}  {summary.distance_km:6.1f} km  {summary.name}"
             if not refresh and sclient.cache.has("summary", sid):
                 skipped_cached += 1
                 click.echo(f"  cached  {label}")
@@ -180,7 +180,7 @@ def list_rides(min_distance_km: float, sport_types: str) -> None:
         raise click.BadParameter("--types must list at least one sport_type")
     total, rows = list_summaries(allowed, min_distance_km * 1000)
     for sid, s in rows:
-        click.echo(f"{sid:>12}  {s.date}  {s.distance_km:6.1f} km  {s.name}")
+        click.echo(f"{sid:>12}  {s.datetime[:10]}  {s.distance_km:6.1f} km  {s.name}")
     click.echo(f"\n{len(rows)} of {total} cached match.")
 
 

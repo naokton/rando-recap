@@ -44,7 +44,8 @@ def list_rides(
     return {
         "total_cached": total,
         "rides": [
-            {"id": sid, "date": s.date, "distance_km": s.distance_km, "name": s.name} for sid, s in rows
+            {"id": sid, "datetime": s.datetime, "distance_km": s.distance_km, "name": s.name}
+            for sid, s in rows
         ],
     }
 
