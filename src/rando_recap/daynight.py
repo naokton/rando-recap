@@ -48,7 +48,7 @@ def build_stretches(
     if n == 0:
         return []
 
-    start_utc = datetime.fromisoformat(activity_start_iso.replace("Z", "+00:00"))
+    start_utc = datetime.fromisoformat(activity_start_iso)
     if start_utc.tzinfo is None:
         start_utc = start_utc.replace(tzinfo=UTC)
     local_tz = timezone(timedelta(seconds=utc_offset_s))

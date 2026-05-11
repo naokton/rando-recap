@@ -173,10 +173,6 @@ COMBINED_ID_PREFIX = "combined:"
 _PASSTHROUGH_STREAM_KEYS = ("latlng", "altitude", "heartrate", "cadence", "watts")
 
 
-def _parse_iso(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
-
-
 def combine_activities(
     parts: list[tuple[dict[str, Any], dict[str, Any]]],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -190,7 +186,7 @@ def combine_activities(
         raise ValueError("combine_activities: no parts given")
     parts = sorted(parts, key=lambda p: p[0].get("start_date") or "")
     first_act = parts[0][0]
-    first_start = _parse_iso(first_act["start_date"])
+    first_start = datetime.fromisoformat(first_act["start_date"])
 
     combined: dict[str, dict[str, Any]] = {}
     distance_offset = 0.0
@@ -213,7 +209,9 @@ def combine_activities(
             raise MissingStreamsError(
                 f"Activity {activity.get('id')} is missing 'time' or 'latlng' streams (no GPS?).",
             )
-        time_offset_s = int((_parse_iso(activity["start_date"]) - first_start).total_seconds())
+        time_offset_s = int(
+            (datetime.fromisoformat(activity["start_date"]) - first_start).total_seconds()
+        )
         _append("time", streams["time"], (t + time_offset_s for t in streams["time"]["data"]))
         if "distance" in streams:
             data = streams["distance"]["data"]
@@ -225,7 +223,9 @@ def combine_activities(
                 _append(key, streams[key], streams[key]["data"])
 
     last_act = parts[-1][0]
-    last_start = first_start if len(parts) == 1 else _parse_iso(last_act["start_date"])
+    last_start = (
+        first_start if len(parts) == 1 else datetime.fromisoformat(last_act["start_date"])
+    )
     elapsed_combined = int(
         (last_start - first_start).total_seconds() + int(last_act.get("elapsed_time") or 0)
     )
