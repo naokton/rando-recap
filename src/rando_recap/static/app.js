@@ -239,16 +239,89 @@ async function renderList(minDist) {
     return;
   }
 
-  body.replaceChildren(
-    el(
-      "table",
-      { class: "rides" },
+  let mergeMode = false;
+  const selected = new Set();
+
+  const toolbar = el("div", { class: "list-toolbar" });
+  const table = el("table", { class: "rides" });
+  body.replaceChildren(toolbar, table);
+
+  const rideHash = (rideId) =>
+    `#${new URLSearchParams({
+      ride: rideId,
+      min_stop: rideMinStop,
+      merge_within_m: rideMergeWithin,
+    })}`;
+
+  const openCombined = () => {
+    if (selected.size < 2) return;
+    // Sort by start datetime so the backend doesn't have to guess intent.
+    const ordered = data.rides
+      .filter((r) => selected.has(r.id))
+      .sort((a, b) => (a.datetime || "").localeCompare(b.datetime || ""));
+    const combinedId = `combined:${ordered.map((r) => r.id).join(",")}`;
+    window.location.hash = rideHash(combinedId).slice(1);
+  };
+
+  const renderToolbar = () => {
+    toolbar.replaceChildren();
+    if (!mergeMode) {
+      toolbar.appendChild(
+        el(
+          "button",
+          {
+            class: "btn",
+            type: "button",
+            onclick: () => {
+              mergeMode = true;
+              renderToolbar();
+              renderTable();
+            },
+          },
+          "Merge rides",
+        ),
+      );
+      return;
+    }
+    const openBtn = el(
+      "button",
+      {
+        class: "btn primary",
+        type: "button",
+        onclick: openCombined,
+      },
+      selected.size >= 2 ? `Open (${selected.size})` : "Open",
+    );
+    if (selected.size < 2) openBtn.setAttribute("disabled", "");
+    toolbar.appendChild(
+      el(
+        "button",
+        {
+          class: "btn",
+          type: "button",
+          onclick: () => {
+            mergeMode = false;
+            selected.clear();
+            renderToolbar();
+            renderTable();
+          },
+        },
+        "Cancel",
+      ),
+    );
+    toolbar.appendChild(openBtn);
+  };
+
+  const renderTable = () => {
+    table.classList.toggle("merge-mode", mergeMode);
+    table.replaceChildren(
       el(
         "thead",
         {},
         el(
           "tr",
           {},
+          mergeMode ? el("th", { class: "pick" }) : null,
           el("th", { class: "date" }, "Date"),
           el("th", { class: "dist" }, "Distance"),
           el("th", { class: "name" }, "Name"),
@@ -257,32 +330,45 @@ async function renderList(minDist) {
       el(
         "tbody",
         {},
-        data.rides.map((r) =>
-          el(
-            "tr",
-            {},
-            el("td", { class: "date" }, (r.datetime || "").slice(0, 10)),
-            el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`),
+        data.rides.map((r) => {
+          const cells = [];
+          let cb = null;
+          if (mergeMode) {
+            cb = el("input", { type: "checkbox" });
+            cells.push(el("td", { class: "pick" }, cb));
+          }
+          cells.push(el("td", { class: "date" }, (r.datetime || "").slice(0, 10)));
+          cells.push(el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`));
+          cells.push(
             el(
               "td",
               { class: "name" },
-              el(
-                "a",
-                {
-                  href: `#${new URLSearchParams({
-                    ride: r.id,
-                    min_stop: rideMinStop,
-                    merge_within_m: rideMergeWithin,
-                  })}`,
-                },
-                r.name,
-              ),
+              mergeMode ? r.name : el("a", { href: rideHash(r.id) }, r.name),
             ),
-          ),
-        ),
+          );
+          const row = el("tr", {}, cells);
+          if (mergeMode) {
+            cb.addEventListener("change", () => {
+              if (cb.checked) selected.add(r.id);
+              else selected.delete(r.id);
+              row.classList.toggle("selected", cb.checked);
+              renderToolbar();
+            });
+            // Whole-row click toggles the checkbox so users don't have to aim.
+            row.addEventListener("click", (e) => {
+              if (e.target.tagName === "INPUT") return;
+              cb.checked = !cb.checked;
+              cb.dispatchEvent(new Event("change"));
+            });
+          }
+          return row;
+        }),
       ),
-    ),
-  );
+    );
+  };
+
+  renderToolbar();
+  renderTable();
 }
 
 // --- timeline ----------------------------------------------------------

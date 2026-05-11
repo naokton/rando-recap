@@ -130,7 +130,7 @@ main {
   background: var(--bg-soft);
   border-radius: 0 0 8px 8px;
 }
-#config-dialog .btn {
+.btn {
   padding: 6px 16px;
   border: 1px solid var(--border);
   background: var(--bg);
@@ -139,20 +139,30 @@ main {
   font: inherit;
   color: var(--fg);
 }
-#config-dialog .btn:hover {
+.btn:hover:not(:disabled) {
   background: var(--bg-soft);
 }
-#config-dialog .btn.primary {
+.btn.primary {
   background: var(--accent);
   color: var(--bg);
   border-color: var(--accent);
 }
-#config-dialog .btn.primary:hover {
+.btn.primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* List view */
+.list-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  max-width: 900px;
+}
 table.rides {
   border-collapse: collapse;
   width: 100%;
@@ -164,6 +174,15 @@ table.rides td {
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
 }
+table.rides th.pick,
+table.rides td.pick {
+  width: 2.5em;
+  padding-right: 0;
+  text-align: center;
+}
+table.rides td.pick input {
+  cursor: pointer;
+}
 table.rides th.date,
 table.rides th.dist {
   width: 8em;
@@ -174,6 +193,16 @@ table.rides th {
 }
 table.rides td.dist {
   text-align: right;
+}
+table.rides.merge-mode tbody tr {
+  cursor: pointer;
+}
+table.rides.merge-mode tbody tr:hover {
+  background: var(--bg-soft);
+}
+table.rides tr.selected,
+table.rides.merge-mode tbody tr.selected:hover {
+  background: #d1fae5;
 }
 
 /* Analysis header */

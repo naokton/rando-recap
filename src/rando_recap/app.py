@@ -6,6 +6,7 @@ import functools
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -116,19 +117,13 @@ class MissingStreamsError(ValueError):
     """Activity is missing the ``time`` or ``latlng`` streams (no GPS)."""
 
 
-def analyze_activity(
-    sclient: StravaClient,
-    activity_id: int,
+def _analyze_core(
+    activity: dict[str, Any],
+    streams: dict[str, Any],
     *,
     min_stop_s: int,
     merge_within_m: float,
-    refresh: bool,
 ) -> AnalysisResult:
-    """Auth is the caller's job. Raises ActivityNotCachedError, MissingStreamsError, or StravaScopeError."""
-    activity = sclient.cache.get("summary", activity_id)
-    if activity is None:
-        raise ActivityNotCachedError(f"Activity {activity_id} not in cache. Run `ride fetch` first.")
-    streams = sclient.get_streams(activity_id, refresh=refresh)
     if "time" not in streams or "latlng" not in streams:
         raise MissingStreamsError("Activity is missing 'time' or 'latlng' streams (no GPS?).")
     controls = detect_controls(
@@ -149,3 +144,127 @@ def analyze_activity(
     )
     turnaround = detect_turnaround(streams["latlng"]["data"], controls)
     return AnalysisResult(activity, streams, controls, segments, daynight, turnaround)
+
+
+def analyze_activity(
+    sclient: StravaClient,
+    activity_id: int,
+    *,
+    min_stop_s: int,
+    merge_within_m: float,
+    refresh: bool,
+) -> AnalysisResult:
+    """Auth is the caller's job. Raises ActivityNotCachedError, MissingStreamsError, or StravaScopeError."""
+    activity = sclient.cache.get("summary", activity_id)
+    if activity is None:
+        raise ActivityNotCachedError(f"Activity {activity_id} not in cache. Run `ride fetch` first.")
+    streams = sclient.get_streams(activity_id, refresh=refresh)
+    return _analyze_core(activity, streams, min_stop_s=min_stop_s, merge_within_m=merge_within_m)
+
+
+# --- combined activities -----------------------------------------------------
+# Multi-day brevets often appear in Strava as separate per-day uploads. We
+# stitch them into one synthetic activity so the analysis pipeline sees a
+# single ride. Inter-activity gaps (e.g. overnight sleep) are preserved as
+# real time-stream gaps, which detect_controls picks up as control stops.
+
+COMBINED_ID_PREFIX = "combined:"
+
+_PASSTHROUGH_STREAM_KEYS = ("latlng", "altitude", "heartrate", "cadence", "watts")
+
+
+def _parse_iso(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+
+def combine_activities(
+    parts: list[tuple[dict[str, Any], dict[str, Any]]],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Stitch (activity, streams) pairs into one synthetic pair, sorted by start time.
+
+    `time` is offset by each part's start relative to the first part's start;
+    `distance` is offset by the previous part's cumulative end; other streams
+    are concatenated as-is.
+    """
+    if not parts:
+        raise ValueError("combine_activities: no parts given")
+    parts = sorted(parts, key=lambda p: p[0].get("start_date") or "")
+    first_act = parts[0][0]
+    first_start = _parse_iso(first_act["start_date"])
+
+    combined: dict[str, dict[str, Any]] = {}
+    distance_offset = 0.0
+
+    def _append(key: str, src: dict[str, Any], values: list[Any]) -> None:
+        bucket = combined.get(key)
+        if bucket is None:
+            bucket = {
+                "type": src.get("type", key),
+                "series_type": src.get("series_type"),
+                "resolution": src.get("resolution"),
+                "data": [],
+            }
+            combined[key] = bucket
+        bucket["data"].extend(values)
+        bucket["original_size"] = len(bucket["data"])
+
+    for activity, streams in parts:
+        if "time" not in streams or "latlng" not in streams:
+            raise MissingStreamsError(
+                f"Activity {activity.get('id')} is missing 'time' or 'latlng' streams (no GPS?).",
+            )
+        time_offset_s = int((_parse_iso(activity["start_date"]) - first_start).total_seconds())
+        _append("time", streams["time"], (t + time_offset_s for t in streams["time"]["data"]))
+        if "distance" in streams:
+            data = streams["distance"]["data"]
+            _append("distance", streams["distance"], (d + distance_offset for d in data))
+            if data:
+                distance_offset += data[-1]
+        for key in _PASSTHROUGH_STREAM_KEYS:
+            if key in streams:
+                _append(key, streams[key], streams[key]["data"])
+
+    last_act = parts[-1][0]
+    last_start = first_start if len(parts) == 1 else _parse_iso(last_act["start_date"])
+    elapsed_combined = int(
+        (last_start - first_start).total_seconds() + int(last_act.get("elapsed_time") or 0)
+    )
+    ids = [str(a.get("id")) for a, _ in parts]
+    name = first_act.get("name", "(combined)")
+    if len(parts) > 1:
+        name = f"{name} + {len(parts) - 1} more"
+    activity = {
+        "id": COMBINED_ID_PREFIX + ",".join(ids),
+        "name": name,
+        "start_date": first_act.get("start_date"),
+        "start_date_local": first_act.get("start_date_local"),
+        "utc_offset": first_act.get("utc_offset", 0),
+        "sport_type": first_act.get("sport_type") or first_act.get("type"),
+        "type": first_act.get("type"),
+        "distance": sum(float(a.get("distance") or 0) for a, _ in parts),
+        "elapsed_time": elapsed_combined,
+        "moving_time": sum(int(a.get("moving_time") or 0) for a, _ in parts),
+        "total_elevation_gain": sum(float(a.get("total_elevation_gain") or 0) for a, _ in parts),
+    }
+    return activity, combined
+
+
+def analyze_combined(
+    sclient: StravaClient,
+    activity_ids: list[int],
+    *,
+    min_stop_s: int,
+    merge_within_m: float,
+    refresh: bool,
+) -> AnalysisResult:
+    if not activity_ids:
+        raise ValueError("analyze_combined: at least one activity id required")
+    parts: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for aid in activity_ids:
+        act = sclient.cache.get("summary", aid)
+        if act is None:
+            raise ActivityNotCachedError(f"Activity {aid} not in cache. Run `ride fetch` first.")
+        streams = sclient.get_streams(aid, refresh=refresh)
+        parts.append((act, streams))
+    activity, streams = combine_activities(parts)
+    return _analyze_core(activity, streams, min_stop_s=min_stop_s, merge_within_m=merge_within_m)

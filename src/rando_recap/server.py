@@ -10,10 +10,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .app import (
+    COMBINED_ID_PREFIX,
     ActivityNotCachedError,
     ConfigError,
     MissingStreamsError,
     analyze_activity,
+    analyze_combined,
     client,
     list_summaries,
     parse_duration,
@@ -50,9 +52,32 @@ def list_rides(
     }
 
 
+def _parse_activity_id(activity_id: str) -> int | list[int]:
+    """Single int id, or list of ints for ``combined:N,N,N`` form."""
+    if activity_id.startswith(COMBINED_ID_PREFIX):
+        raw = activity_id[len(COMBINED_ID_PREFIX) :]
+        try:
+            ids = [int(x) for x in raw.split(",") if x]
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid combined activity id: {activity_id!r}"
+            ) from e
+        if not ids:
+            raise HTTPException(
+                status_code=400, detail=f"Combined id has no activities: {activity_id!r}"
+            )
+        return ids
+    try:
+        return int(activity_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid activity id: {activity_id!r}"
+        ) from e
+
+
 @app.get("/api/rides/{activity_id}/analysis")
 def analyze_ride(
-    activity_id: int,
+    activity_id: str,
     min_stop: str = Query("5m"),
     merge_within_m: float = Query(100.0, ge=0),
     refresh: bool = Query(False),
@@ -69,14 +94,24 @@ def analyze_ride(
     if not c.authenticated:
         raise HTTPException(status_code=401, detail="Not authenticated. Run `ride login` first.")
 
+    parsed = _parse_activity_id(activity_id)
     try:
-        result = analyze_activity(
-            c,
-            activity_id,
-            min_stop_s=min_stop_s,
-            merge_within_m=merge_within_m,
-            refresh=refresh,
-        )
+        if isinstance(parsed, list):
+            result = analyze_combined(
+                c,
+                parsed,
+                min_stop_s=min_stop_s,
+                merge_within_m=merge_within_m,
+                refresh=refresh,
+            )
+        else:
+            result = analyze_activity(
+                c,
+                parsed,
+                min_stop_s=min_stop_s,
+                merge_within_m=merge_within_m,
+                refresh=refresh,
+            )
     except ActivityNotCachedError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except MissingStreamsError as e:
