@@ -220,30 +220,49 @@ table.rides.merge-mode tbody tr.selected:hover {
 
 .summary {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  justify-content: start;
+  gap: 32px;
   margin: 8px 0 16px;
 }
-.summary-row,
-.summary .item-group {
+.summary-col {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 28px;
-}
-.summary .item-group {
-  gap: 8px 20px;
+  flex-direction: column;
+  gap: 10px;
 }
 .summary .item {
-  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .summary .label {
   color: var(--muted);
-  margin-right: 6px;
+  font-size: 13px;
 }
 .summary .value {
   font-weight: 600;
   font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.summary .breakdown {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: center;
+  gap: 3px 8px;
+  padding-left: 14px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.summary .breakdown .dn-row {
+  display: contents;
+}
+.summary .breakdown .dn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.summary .breakdown .dn-value {
+  justify-self: end;
 }
 
 /* Timeline */

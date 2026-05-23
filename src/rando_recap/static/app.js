@@ -1096,29 +1096,39 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
       el("span", { class: "value" }, value),
     );
 
-  const summaryRows = [
-    [
-      item("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
-      item("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
-    ],
-    [item("Elapsed", fmtDur(a.elapsed_time_s))],
-    [
-      item("Moving", fmtDur(a.moving_time_s)),
-      el(
-        "div",
-        { class: "item-group" },
-        item("Day", fmtDur(a.moving_day_time_s)),
-        item("Twilight", fmtDur(a.moving_twilight_time_s)),
-        item("Night", fmtDur(a.moving_night_time_s)),
-      ),
-    ],
-    [item("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s))],
-  ];
+  const dnRow = (state, value) =>
+    el(
+      "div",
+      { class: "dn-row" },
+      el("span", { class: "dn-dot", style: `background:${DAYNIGHT_COLORS[state]}` }),
+      el("span", { class: "dn-label" }, state),
+      el("span", { class: "dn-value" }, value),
+    );
+
   root.appendChild(
     el(
       "div",
       { class: "summary" },
-      summaryRows.map((row) => el("div", { class: "summary-row" }, row)),
+      el(
+        "div",
+        { class: "summary-col" },
+        item("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
+        item("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+      ),
+      el(
+        "div",
+        { class: "summary-col" },
+        item("Elapsed", fmtDur(a.elapsed_time_s)),
+        item("Moving", fmtDur(a.moving_time_s)),
+        el(
+          "div",
+          { class: "breakdown" },
+          dnRow("day", fmtDur(a.moving_day_time_s)),
+          dnRow("twilight", fmtDur(a.moving_twilight_time_s)),
+          dnRow("night", fmtDur(a.moving_night_time_s)),
+        ),
+        item("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s)),
+      ),
     ),
   );
 
