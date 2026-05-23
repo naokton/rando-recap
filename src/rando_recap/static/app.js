@@ -489,7 +489,7 @@ function renderTimeline(activity, stops, model) {
     grid.appendChild(
       el(
         "div",
-        { class: "track-stop", style: `grid-column: ${stopCol}` },
+        { class: "track-stop", style: `grid-column: ${stopCol}`, "data-stop": stopKey },
         el("span", { class: "dot" }),
       ),
     );
@@ -565,7 +565,7 @@ function renderStopsTable(activity, stops, cumKm) {
 function renderSegmentsTable(segments) {
   return el(
     "table",
-    { class: "data" },
+    { class: "data segments" },
     el(
       "thead",
       {},
@@ -736,14 +736,15 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
   }
 }
 
-function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitInfo, onClickStop) {
-  // The split stop is shown on both halves so it anchors visibly on each map.
+function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitStops, onClickStop) {
+  // splitStops are the split stops bordering this pane: each anchors the
+  // boundary it owns, so it's shown here even though it falls outside the
+  // pane's index range.
   const visible = stops
     .map((c, i) => ({ c, i }))
     .filter(({ c, i }) => {
       const inRange = c.index_before >= range.startIdx && c.index_before <= range.endIdx;
-      const isSnap = splitInfo && splitInfo.stopIdx === i;
-      return inRange || isSnap;
+      return inRange || splitStops.has(i);
     });
   if (!visible.length) return null;
   // Radius normalization uses the global maxRest so marker sizes are
@@ -785,9 +786,10 @@ function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitInfo, onClickS
     if (onClickStop) {
       marker.on("contextmenu", (ev) => {
         L.DomEvent.preventDefault(ev.originalEvent);
-        if (splitInfo && splitInfo.stopIdx === i) return;
-        const label = splitInfo ? "Move split here" : "Split here";
-        openMarkerMenu(ev.originalEvent, [{ label, onSelect: () => onClickStop(i) }]);
+        if (splitStops.has(i)) return;
+        openMarkerMenu(ev.originalEvent, [
+          { label: "Split here", onSelect: () => onClickStop(i) },
+        ]);
       });
     }
     return marker;
@@ -850,7 +852,7 @@ function renderMap(container, data, model, range, ctx) {
     cumKm,
     fmtClock,
     range,
-    ctx.splitInfo,
+    ctx.splitStops,
     ctx.onClickStop,
   );
   if (hasDaynight) addMapLegend(map, !!stopsLayer);
@@ -873,19 +875,19 @@ function renderMap(container, data, model, range, ctx) {
       hideTitle: "Hide stops",
       showTitle: "Show stops",
     });
-  if (ctx.onMerge)
+  if (ctx.onRemoveSplit)
     addToggleControl(map, {
       className: "merge-btn",
       label: "✕",
-      title: "Close split view",
-      onClick: () => ctx.onMerge(),
+      title: "Remove this split",
+      onClick: () => ctx.onRemoveSplit(),
       position: "topright",
     });
   return map;
 }
 
 function buildMapArea(wrapper, data, model) {
-  let splitInfo = null; // null = single-map mode
+  let splits = []; // sorted ascending stop indices; [] = single-map mode
   let maps = [];
 
   const teardown = () => {
@@ -895,43 +897,64 @@ function buildMapArea(wrapper, data, model) {
     clearMapPeers();
   };
 
-  // Right-click menu on a stop marker drives splitting: it both opens
-  // a route at a chosen stop (pre-split) and relocates the split point
-  // (post-split). Merging is done via the close button on the right pane.
+  // Right-click "Split here" on a stop marker adds a split at that stop,
+  // carving the route into one more pane. Splitting an existing split stop
+  // is a no-op. Each split is removed via the ✕ on the pane to its right.
   const onClickStop = (i) => {
-    if (splitInfo && splitInfo.stopIdx === i) return;
-    splitInfo = splitInfoForStop(data.stops, i);
+    if (splits.includes(i)) return;
+    splits = [...splits, i].sort((a, b) => a - b);
     render();
   };
 
-  const onMerge = () => {
-    splitInfo = null;
+  const removeSplit = (stopIdx) => {
+    splits = splits.filter((i) => i !== stopIdx);
     render();
+  };
+
+  // Mark the current split stops in the timeline and Stops table (which carry
+  // matching data-stop keys) so they read as distinct from ordinary stops, and
+  // thicken the Segments-table divider at each split: the segment row arriving
+  // at stop i is labelled "<prev> → S{i+1}", so its bottom border is the line
+  // between that stop's incoming and outgoing segments.
+  const syncSplitStops = () => {
+    root.querySelectorAll(".split-stop").forEach((e) => e.classList.remove("split-stop"));
+    root.querySelectorAll(".split-border").forEach((e) => e.classList.remove("split-border"));
+    for (const i of splits) {
+      root.querySelectorAll(`[data-stop="c${i}"]`).forEach((e) => e.classList.add("split-stop"));
+    }
+    const suffixes = splits.map((i) => `→ S${i + 1}`);
+    root.querySelectorAll("table.segments tr.row[data-seg]").forEach((tr) => {
+      if (suffixes.some((suf) => tr.dataset.seg.endsWith(suf))) tr.classList.add("split-border");
+    });
   };
 
   const render = () => {
     teardown();
     wrapper.innerHTML = "";
     const last = data.latlng.length - 1;
-    // Close button sits on the right pane; the left has no merge button.
-    const panes = splitInfo
-      ? [
-          {
-            range: { startIdx: 0, endIdx: splitInfo.beforeIdx },
-            ctx: { splitInfo, onClickStop },
-          },
-          {
-            range: { startIdx: splitInfo.afterIdx, endIdx: last },
-            ctx: { splitInfo, onClickStop, onMerge },
-          },
-        ]
-      : [
-          {
-            range: { startIdx: 0, endIdx: last },
-            ctx: { splitInfo: null, onClickStop },
-          },
-        ];
-    wrapper.classList.toggle("split", !!splitInfo);
+    const boundaries = splits.map((i) => splitInfoForStop(data.stops, i));
+    // N splits → N+1 panes. Pane k runs from the previous split's afterIdx (or
+    // the track start) to the next split's beforeIdx (or the track end). Each
+    // split stop is shown on the two panes it borders, and every pane but the
+    // first carries a ✕ that removes the split on its left edge.
+    const panes = [];
+    for (let k = 0; k <= boundaries.length; k++) {
+      const left = boundaries[k - 1]; // undefined on the first pane
+      const right = boundaries[k]; // undefined on the last pane
+      panes.push({
+        range: {
+          startIdx: left ? left.afterIdx : 0,
+          endIdx: right ? right.beforeIdx : last,
+        },
+        ctx: {
+          splitStops: new Set([left, right].filter(Boolean).map((b) => b.stopIdx)),
+          onClickStop,
+          onRemoveSplit: left ? () => removeSplit(left.stopIdx) : undefined,
+        },
+      });
+    }
+    wrapper.classList.toggle("split", splits.length > 0);
+    syncSplitStops();
     const inners = panes.map(() => {
       const d = el("div", { class: "leaflet-map" });
       wrapper.appendChild(d);
