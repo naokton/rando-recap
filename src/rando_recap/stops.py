@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+# Smallest accepted min_stop. The sample interval is ~1s, so a threshold of
+# 1s (or less) flags every consecutive pair as a stop — one "stop" per GPS
+# point — which froze the UI. Require strictly more than this floor.
+MIN_STOP_FLOOR_S = 1
+
 
 @dataclass
 class Stop:
@@ -35,6 +40,8 @@ def detect_stops(
     latlng: list[list[float]],
     min_stop_s: int,
 ) -> list[Stop]:
+    if min_stop_s <= MIN_STOP_FLOOR_S:
+        raise ValueError(f"min_stop must be greater than {MIN_STOP_FLOOR_S}s, got {min_stop_s}s")
     if len(time_s) != len(latlng):
         raise ValueError(f"time/latlng length mismatch: {len(time_s)} vs {len(latlng)}")
     stops: list[Stop] = []

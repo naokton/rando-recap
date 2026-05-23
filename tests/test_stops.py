@@ -1,4 +1,16 @@
+import pytest
+
 from rando_recap.stops import Stop, detect_stops, merge_nearby_stops
+
+
+@pytest.mark.parametrize("min_stop_s", [0, 1])
+def test_rejects_threshold_at_or_below_floor(min_stop_s):
+    # A threshold <= the ~1s sample interval flags every consecutive pair as a
+    # stop — one "stop" per GPS point — which froze the UI. Reject instead.
+    time_s = list(range(0, 100))
+    latlng = [[0.0, 0.0]] * len(time_s)
+    with pytest.raises(ValueError, match="greater than"):
+        detect_stops(time_s, latlng, min_stop_s=min_stop_s)
 
 
 def test_detects_stop_above_threshold():
