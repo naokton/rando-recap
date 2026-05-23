@@ -41,6 +41,10 @@ header a {
 header a:hover {
   text-decoration: underline;
 }
+/* Lucide icons (lucide-static @1.16.0, ISC) rendered via CSS mask: the SVG is
+   the alpha mask and `background-color: currentColor` paints it, so icons pick
+   up the surrounding text color — including theme vars and :hover. Each button
+   sets its glyph through the --icon custom property on a ::before pseudo. */
 .config-btn {
   margin-left: auto;
   background: var(--bg);
@@ -48,13 +52,20 @@ header a:hover {
   border-radius: 6px;
   width: 44px;
   height: 44px;
-  font-size: 26px;
-  line-height: 1;
   cursor: pointer;
   color: var(--fg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+.config-btn::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  background-color: currentColor;
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/settings.svg");
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
 }
 .config-btn:hover {
   background: var(--bg-soft);
@@ -175,6 +186,21 @@ main {
 /* Filter popover */
 .filter-wrap {
   position: relative;
+}
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+}
+.filter-btn::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  background-color: currentColor;
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/filter.svg");
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
 }
 .filter-btn.active {
   border-color: var(--accent);
@@ -468,6 +494,26 @@ body.map-fullscreen-active {
 }
 .map-toggle-btn.off {
   color: var(--muted);
+}
+/* Specificity must beat Leaflet's own `.leaflet-bar a` rule (0,1,1), otherwise
+   its `display: block` keeps the ::before inline and width/height are ignored. */
+.map-toggle-btn.fullscreen-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fullscreen-btn::before {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/maximize.svg");
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
+.fullscreen-btn.is-fullscreen::before {
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/minimize.svg");
 }
 .map-legend {
   background: var(--bg);

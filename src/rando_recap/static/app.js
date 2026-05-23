@@ -222,8 +222,13 @@ function buildFilterControl(minDist) {
   );
   const btn = el(
     "button",
-    { class: `btn filter-btn${active ? " active" : ""}`, type: "button", onclick: () => toggle() },
-    "Filter",
+    {
+      class: `btn filter-btn${active ? " active" : ""}`,
+      type: "button",
+      title: "Filter",
+      "aria-label": "Filter",
+      onclick: () => toggle(),
+    },
   );
   const wrap = el("div", { class: "filter-wrap" }, btn, form);
 
@@ -1061,11 +1066,14 @@ function addFullscreenControl(map, container, bounds) {
   let escHandler = null;
   const setOn = addStatefulButton(map, {
     className: "fullscreen-btn",
-    labelOn: "⇱",
-    labelOff: "⛶",
+    // Icons come from CSS (.fullscreen-btn[.is-fullscreen]::before); the label
+    // text stays empty and `is-fullscreen` selects maximize vs. minimize.
+    labelOn: "",
+    labelOff: "",
     titleOn: "Exit fullscreen",
     titleOff: "Toggle fullscreen",
-    onChange: (on) => {
+    onChange: (on, btn) => {
+      if (btn) btn.classList.toggle("is-fullscreen", on);
       container.classList.toggle("map-fullscreen", on);
       document.body.classList.toggle("map-fullscreen-active", on);
       if (on) {
