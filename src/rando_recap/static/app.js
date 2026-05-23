@@ -1312,6 +1312,12 @@ route();
     (parseInt(minStopM.value, 10) || 0) * 60 +
     (parseInt(minStopS.value, 10) || 0);
 
+  // Clear the custom invalid state as soon as a field changes; otherwise it
+  // sticks and the browser blocks the next submit before our handler runs.
+  for (const input of [minStopH, minStopM, minStopS]) {
+    input.addEventListener("input", () => minStopS.setCustomValidity(""));
+  }
+
   document.getElementById("config-btn").addEventListener("click", () => {
     const saved = loadUserParams();
     const { h, m, s } = secondsToHMS(minStopToSeconds(saved.minStop) ?? minStopToSeconds(DEFAULT_MIN_STOP));
