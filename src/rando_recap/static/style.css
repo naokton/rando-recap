@@ -125,9 +125,41 @@ main {
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
+/* Hide the number-input spinner arrows on settings fields. */
+.field input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.field input[type="number"]::-webkit-inner-spin-button,
+.field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 .field .unit {
   color: var(--muted);
   width: 1.4em;
+}
+/* Hours/minutes/seconds group for Min stop: each input sized to fit a
+   2-digit value, with its unit label tucked beside it. */
+.field .hms {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.field .hms input {
+  flex: 0 1 3.5em;
+  text-align: right;
+}
+.field .hms .unit {
+  width: auto;
+}
+/* Match the lone Merge-within input to the width of a single h/m/s box and
+   keep it left-aligned instead of stretching across the row. */
+#cfg-merge {
+  flex: 0 1 4.5em;
+  text-align: right;
 }
 /* Dividers between settings rows; the filter popover has a single field. */
 #config-dialog .field {

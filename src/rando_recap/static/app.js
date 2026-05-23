@@ -5,6 +5,25 @@ const DEFAULT_MIN_DIST_KM = 190;
 const DEFAULT_MIN_STOP = "5m";
 const DEFAULT_MERGE_WITHIN_M = 100;
 const STORAGE_KEY_USER_PARAMS = "rando-recap.user-params";
+// Mirror of the backend floor (stops.py MIN_STOP_FLOOR_S): the ~1s sample
+// interval means a threshold at or below 1s flags every point as a stop, so
+// the API rejects it. Require strictly more than this in the form too.
+const MIN_STOP_FLOOR_S = 1;
+
+// Parse a duration string ('5m', '300s', '1h', '90') to seconds, mirroring
+// the backend parse_duration. Returns null on unrecognized input.
+function minStopToSeconds(value) {
+  const m = String(value).trim().match(/^(\d+)\s*([smh]?)$/i);
+  if (!m) return null;
+  const unit = (m[2] || "m").toLowerCase();
+  return parseInt(m[1], 10) * { s: 1, m: 60, h: 3600 }[unit];
+}
+
+// Break total seconds into {h, m, s} for the form fields.
+function secondsToHMS(total) {
+  const t = Math.max(0, Math.floor(total));
+  return { h: Math.floor(t / 3600), m: Math.floor((t % 3600) / 60), s: t % 60 };
+}
 
 // Persisted UI preferences so they survive list → analysis → list navigation
 // and reloads. The URL hash still carries authoritative state when present;
@@ -1283,12 +1302,22 @@ route();
 (function setupConfigDialog() {
   const dialog = document.getElementById("config-dialog");
   const form = document.getElementById("config-form");
-  const minStopInput = document.getElementById("cfg-min-stop");
+  const minStopH = document.getElementById("cfg-min-stop-h");
+  const minStopM = document.getElementById("cfg-min-stop-m");
+  const minStopS = document.getElementById("cfg-min-stop-s");
   const mergeInput = document.getElementById("cfg-merge");
+
+  const readMinStopSeconds = () =>
+    (parseInt(minStopH.value, 10) || 0) * 3600 +
+    (parseInt(minStopM.value, 10) || 0) * 60 +
+    (parseInt(minStopS.value, 10) || 0);
 
   document.getElementById("config-btn").addEventListener("click", () => {
     const saved = loadUserParams();
-    minStopInput.value = saved.minStop;
+    const { h, m, s } = secondsToHMS(minStopToSeconds(saved.minStop) ?? minStopToSeconds(DEFAULT_MIN_STOP));
+    minStopH.value = h;
+    minStopM.value = m;
+    minStopS.value = s;
     mergeInput.value = saved.mergeWithinM;
     dialog.showModal();
   });
@@ -1297,7 +1326,14 @@ route();
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const minStop = minStopInput.value.trim() || DEFAULT_MIN_STOP;
+    const minStopSeconds = readMinStopSeconds();
+    if (minStopSeconds <= MIN_STOP_FLOOR_S) {
+      minStopS.setCustomValidity(`Min stop must be greater than ${MIN_STOP_FLOOR_S}s.`);
+      minStopS.reportValidity();
+      return;
+    }
+    minStopS.setCustomValidity("");
+    const minStop = `${minStopSeconds}s`;
     const mergeWithinM = parseMergeWithin(mergeInput.value);
 
     // Capture currently-rendered params *before* saving so we can detect

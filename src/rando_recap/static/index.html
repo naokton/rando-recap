@@ -26,9 +26,15 @@
         </div>
         <div class="dlg-body">
           <div class="field">
-            <label for="cfg-min-stop">Min stop</label>
-            <input id="cfg-min-stop" type="text" />
-            <span class="unit"></span>
+            <label for="cfg-min-stop-h">Min stop</label>
+            <div class="hms">
+              <input id="cfg-min-stop-h" type="number" min="0" step="1" />
+              <span class="unit">h</span>
+              <input id="cfg-min-stop-m" type="number" min="0" max="59" step="1" />
+              <span class="unit">m</span>
+              <input id="cfg-min-stop-s" type="number" min="0" max="59" step="1" />
+              <span class="unit">s</span>
+            </div>
           </div>
           <div class="field">
             <label for="cfg-merge">Merge within</label>
