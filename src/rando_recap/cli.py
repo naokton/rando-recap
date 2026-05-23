@@ -71,7 +71,7 @@ def login() -> None:
     "--min-stop",
     default="5m",
     show_default=True,
-    help="Stops at least this long are treated as controls. e.g. 5m, 300s, 1h.",
+    help="Stops at least this long are detected. e.g. 5m, 300s, 1h.",
 )
 @click.option(
     "--merge-within",
@@ -79,7 +79,7 @@ def login() -> None:
     type=float,
     default=100.0,
     show_default=True,
-    help="Adjacent controls within this path distance (meters) are merged. 0 disables.",
+    help="Adjacent stops within this path distance (meters) are merged. 0 disables.",
 )
 @click.option("--refresh", is_flag=True, help="Re-fetch streams even if cached.")
 @click.option(
@@ -95,7 +95,7 @@ def analyze(
     refresh: bool,
     json_out: bool,
 ) -> None:
-    """Analyze one cached activity and print per-control / per-segment stats."""
+    """Analyze one cached activity and print per-stop / per-segment stats."""
     sclient = _client()
     if not sclient.authenticated:
         raise click.ClickException("Not authenticated. Run `ride login` first.")
@@ -119,7 +119,7 @@ def analyze(
         sys.stdout.write(render_json(result))
         sys.stdout.write("\n")
     else:
-        render_terminal(result.activity, result.controls, result.segments)
+        render_terminal(result.activity, result.stops, result.segments)
 
 
 @main.command()

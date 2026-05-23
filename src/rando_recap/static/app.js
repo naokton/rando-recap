@@ -42,12 +42,12 @@ function saveUserParams(partial) {
 
 const SEGMENT_COLOR = "#048f67";
 const SEGMENT_HOVER_COLOR = "#0ea5e9";
-const CONTROL_COLOR = "#dc2626";
+const STOP_COLOR = "#dc2626";
 const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
 
 const MIN_MAP_HEIGHT_PX = 200;
-const CONTROL_MARKER_MIN_R = 3;
-const CONTROL_MARKER_MAX_R = 40;
+const STOP_MARKER_MIN_R = 3;
+const STOP_MARKER_MAX_R = 40;
 
 function fmtDur(seconds) {
   if (seconds == null) return "-";
@@ -95,9 +95,9 @@ function el(tag, attrs = {}, ...children) {
   return e;
 }
 
-function splitInfoForControl(controls, idx) {
-  const c = controls[idx];
-  return { beforeIdx: c.index_before, afterIdx: c.index_after, controlIdx: idx };
+function splitInfoForStop(stops, idx) {
+  const c = stops[idx];
+  return { beforeIdx: c.index_before, afterIdx: c.index_after, stopIdx: idx };
 }
 
 async function fetchJson(url) {
@@ -135,7 +135,7 @@ function unmountCurrentView() {
 //
 // peers is keyed by (stop/seg) key with an array of fns: in split-map mode
 // the same segment can appear on both halves (the spanning segment) and the
-// snap control's marker is shown on both maps, so a key may have >1 peer.
+// snap stop's marker is shown on both maps, so a key may have >1 peer.
 let link = null;
 const HOVER_KINDS = ["stop", "seg"];
 
@@ -372,23 +372,23 @@ async function renderList(minDist) {
 }
 
 // --- timeline ----------------------------------------------------------
-function buildTimelineModel(controls, segments) {
-  const stopLabels = ["Start", ...controls.map((_, i) => `C${i + 1}`), "End"];
+function buildTimelineModel(stops, segments) {
+  const stopLabels = ["Start", ...stops.map((_, i) => `S${i + 1}`), "End"];
   const segByLabel = Object.fromEntries(segments.map((s) => [s.label, s]));
   const segLabels = stopLabels.slice(0, -1).map((s, i) => `${s} → ${stopLabels[i + 1]}`);
   const orderedSegs = segLabels.map((l) => segByLabel[l] ?? null);
   const cumKm = [0];
   for (const s of orderedSegs) cumKm.push(cumKm[cumKm.length - 1] + (s ? s.distance_m / 1000 : 0));
   const lastSeg = orderedSegs[orderedSegs.length - 1];
-  const endS = controls.length
-    ? controls[controls.length - 1].time_after_s + (lastSeg ? lastSeg.duration_s : 0)
+  const endS = stops.length
+    ? stops[stops.length - 1].time_after_s + (lastSeg ? lastSeg.duration_s : 0)
     : orderedSegs[0]
       ? orderedSegs[0].duration_s
       : 0;
   return { stopLabels, segLabels, orderedSegs, cumKm, endS };
 }
 
-function renderTimeline(activity, controls, model) {
+function renderTimeline(activity, stops, model) {
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
   const { stopLabels, segLabels, orderedSegs, cumKm, endS } = model;
 
@@ -411,7 +411,7 @@ function renderTimeline(activity, controls, model) {
       rest = 0;
       stopKey = "end";
     } else {
-      const c = controls[i - 1];
+      const c = stops[i - 1];
       arrive = fmtClock(c.time_before_s);
       depart = fmtClock(c.time_after_s);
       rest = c.rest_s;
@@ -473,8 +473,8 @@ function renderTimeline(activity, controls, model) {
 }
 
 // --- tables ------------------------------------------------------------
-function renderControlsTable(activity, controls, cumKm) {
-  if (!controls.length) {
+function renderStopsTable(activity, stops, cumKm) {
+  if (!stops.length) {
     return el("div", { class: "empty" }, "No stops above threshold detected.");
   }
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
@@ -497,11 +497,11 @@ function renderControlsTable(activity, controls, cumKm) {
     el(
       "tbody",
       {},
-      controls.map((c, i) =>
+      stops.map((c, i) =>
         el(
           "tr",
           { class: "row", "data-stop": `c${i}` },
-          el("td", {}, `C${i + 1}`),
+          el("td", {}, `S${i + 1}`),
           el("td", {}, cumKm[i + 1].toFixed(1)),
           el("td", {}, fmtClock(c.time_before_s)),
           el("td", {}, fmtClock(c.time_after_s)),
@@ -686,20 +686,20 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
   }
 }
 
-function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, onClickControl) {
-  // The split control is shown on both halves so it anchors visibly on each map.
-  const visible = controls
+function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitInfo, onClickStop) {
+  // The split stop is shown on both halves so it anchors visibly on each map.
+  const visible = stops
     .map((c, i) => ({ c, i }))
     .filter(({ c, i }) => {
       const inRange = c.index_before >= range.startIdx && c.index_before <= range.endIdx;
-      const isSnap = splitInfo && splitInfo.controlIdx === i;
+      const isSnap = splitInfo && splitInfo.stopIdx === i;
       return inRange || isSnap;
     });
   if (!visible.length) return null;
   // Radius normalization uses the global maxRest so marker sizes are
   // comparable across the two split maps, not just within a half.
-  const maxRest = Math.max(1, ...controls.map((c) => c.rest_s || 0));
-  // Render largest circles first so smaller ones land on top — when controls
+  const maxRest = Math.max(1, ...stops.map((c) => c.rest_s || 0));
+  // Render largest circles first so smaller ones land on top — when stops
   // cluster at the same place, the smaller circle stays hoverable instead of
   // being buried under the larger one.
   const ordered = visible
@@ -711,8 +711,8 @@ function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, on
       // rest at the max radius (so it always fits on the map) while preserving
       // relative size differences between shorter rests.
       radius:
-        CONTROL_MARKER_MIN_R +
-        (CONTROL_MARKER_MAX_R - CONTROL_MARKER_MIN_R) * Math.sqrt((c.rest_s || 0) / maxRest),
+        STOP_MARKER_MIN_R +
+        (STOP_MARKER_MAX_R - STOP_MARKER_MIN_R) * Math.sqrt((c.rest_s || 0) / maxRest),
     }))
     .sort((a, b) => b.radius - a.radius);
   const markers = ordered.map(({ c, i, radius }) => {
@@ -721,23 +721,23 @@ function drawControlMarkers(map, controls, cumKm, fmtClock, range, splitInfo, on
     const depart = fmtClock(c.time_after_s);
     const marker = L.circleMarker([c.lat, c.lng], {
       radius,
-      color: CONTROL_COLOR,
+      color: STOP_COLOR,
       weight: 1,
-      fillColor: CONTROL_COLOR,
+      fillColor: STOP_COLOR,
       fillOpacity: 0.2,
-    }).bindTooltip(`<b>C${i + 1}</b><br>${km} km<br>${arrive} → ${depart}<br>${fmtDur(c.rest_s)}`, {
+    }).bindTooltip(`<b>S${i + 1}</b><br>${km} km<br>${arrive} → ${depart}<br>${fmtDur(c.rest_s)}`, {
       direction: "top",
       offset: [0, -4],
     });
     registerMapPeer("stop", `c${i}`, marker, (on) => {
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
-    if (onClickControl) {
+    if (onClickStop) {
       marker.on("contextmenu", (ev) => {
         L.DomEvent.preventDefault(ev.originalEvent);
-        if (splitInfo && splitInfo.controlIdx === i) return;
+        if (splitInfo && splitInfo.stopIdx === i) return;
         const label = splitInfo ? "Move split here" : "Split here";
-        openMarkerMenu(ev.originalEvent, [{ label, onSelect: () => onClickControl(i) }]);
+        openMarkerMenu(ev.originalEvent, [{ label, onSelect: () => onClickStop(i) }]);
       });
     }
     return marker;
@@ -769,7 +769,7 @@ function attachMapResizer(mapDiv, handle) {
 }
 
 function renderMap(container, data, model, range, ctx) {
-  const { latlng, segments, controls, daynight, activity } = data;
+  const { latlng, segments, stops, daynight, activity } = data;
   if (!latlng || !latlng.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
     return null;
@@ -794,16 +794,16 @@ function renderMap(container, data, model, range, ctx) {
   const hasDaynight = drawDaynightPath(map, latlng, daynight, range);
   const segLines = drawSegmentLines(map, latlng, segments, hasDaynight, range);
   drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS);
-  const controlsLayer = drawControlMarkers(
+  const stopsLayer = drawStopMarkers(
     map,
-    controls,
+    stops,
     cumKm,
     fmtClock,
     range,
     ctx.splitInfo,
-    ctx.onClickControl,
+    ctx.onClickStop,
   );
-  if (hasDaynight) addMapLegend(map, !!controlsLayer);
+  if (hasDaynight) addMapLegend(map, !!stopsLayer);
 
   const bounds = segLines.length
     ? L.featureGroup(segLines).getBounds()
@@ -816,12 +816,12 @@ function renderMap(container, data, model, range, ctx) {
   map.on("unload", () => ro.disconnect());
 
   addFullscreenControl(map, container, bounds);
-  if (controlsLayer)
-    addLayerToggle(map, controlsLayer, {
-      className: "controls-btn",
+  if (stopsLayer)
+    addLayerToggle(map, stopsLayer, {
+      className: "stops-btn",
       label: "●",
-      hideTitle: "Hide controls",
-      showTitle: "Show controls",
+      hideTitle: "Hide stops",
+      showTitle: "Show stops",
     });
   if (ctx.onMerge)
     addToggleControl(map, {
@@ -845,12 +845,12 @@ function buildMapArea(wrapper, data, model) {
     clearMapPeers();
   };
 
-  // Right-click menu on a control marker drives splitting: it both opens
-  // a route at a chosen control (pre-split) and relocates the split point
+  // Right-click menu on a stop marker drives splitting: it both opens
+  // a route at a chosen stop (pre-split) and relocates the split point
   // (post-split). Merging is done via the close button on the right pane.
-  const onClickControl = (i) => {
-    if (splitInfo && splitInfo.controlIdx === i) return;
-    splitInfo = splitInfoForControl(data.controls, i);
+  const onClickStop = (i) => {
+    if (splitInfo && splitInfo.stopIdx === i) return;
+    splitInfo = splitInfoForStop(data.stops, i);
     render();
   };
 
@@ -863,22 +863,22 @@ function buildMapArea(wrapper, data, model) {
     teardown();
     wrapper.innerHTML = "";
     const last = data.latlng.length - 1;
-    // Close button sits on the right pane; the left has no merge control.
+    // Close button sits on the right pane; the left has no merge button.
     const panes = splitInfo
       ? [
           {
             range: { startIdx: 0, endIdx: splitInfo.beforeIdx },
-            ctx: { splitInfo, onClickControl },
+            ctx: { splitInfo, onClickStop },
           },
           {
             range: { startIdx: splitInfo.afterIdx, endIdx: last },
-            ctx: { splitInfo, onClickControl, onMerge },
+            ctx: { splitInfo, onClickStop, onMerge },
           },
         ]
       : [
           {
             range: { startIdx: 0, endIdx: last },
-            ctx: { splitInfo: null, onClickControl },
+            ctx: { splitInfo: null, onClickStop },
           },
         ];
     wrapper.classList.toggle("split", !!splitInfo);
@@ -979,7 +979,7 @@ function addToggleControl(map, { className, label, title, onClick, position = "t
   map.addControl(new Ctrl());
 }
 
-function addMapLegend(map, hasControls) {
+function addMapLegend(map, hasStops) {
   const Ctrl = L.Control.extend({
     options: { position: "bottomright" },
     onAdd() {
@@ -991,14 +991,14 @@ function addMapLegend(map, hasControls) {
           el("span", {}, state),
         ),
       );
-      if (hasControls) {
+      if (hasStops) {
         items.push(
           el(
             "div",
             { class: "legend-item" },
             el("span", {
               class: "swatch-dot",
-              style: `background:${CONTROL_COLOR}33;border-color:${CONTROL_COLOR}`,
+              style: `background:${STOP_COLOR}33;border-color:${STOP_COLOR}`,
             }),
             el("span", {}, "stop"),
           ),
@@ -1015,8 +1015,8 @@ function addMapLegend(map, hasControls) {
 function addFullscreenControl(map, container, bounds) {
   let escHandler = null;
   const setOn = addStatefulButton(map, {
-    className: "fullscreen-btn",
-    labelOn: "⇱",
+    className: "fullscreen-btn", 
+   labelOn: "⇱",
     labelOff: "⛶",
     titleOn: "Exit fullscreen",
     titleOff: "Toggle fullscreen",
@@ -1109,7 +1109,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     ),
   );
 
-  const model = buildTimelineModel(data.controls, data.segments);
+  const model = buildTimelineModel(data.stops, data.segments);
 
   // ---------------------
   // Map
@@ -1125,7 +1125,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
 
   // ---------------------
   // Timeline
-  root.appendChild(renderTimeline(data.activity, data.controls, model));
+  root.appendChild(renderTimeline(data.activity, data.stops, model));
 
   // ---------------------
   // Table
@@ -1136,8 +1136,8 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
       el(
         "section",
         {},
-        el("h2", {}, "Controls"),
-        renderControlsTable(data.activity, data.controls, model.cumKm),
+        el("h2", {}, "Stops"),
+        renderStopsTable(data.activity, data.stops, model.cumKm),
       ),
       el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
     ),

@@ -1,4 +1,4 @@
-from rando_recap.stops import Control
+from rando_recap.stops import Stop
 from rando_recap.turnaround import detect_turnaround
 
 
@@ -16,38 +16,38 @@ def test_zero_distance_returns_none():
     assert detect_turnaround([[0.0, 0.0]] * 5, []) is None
 
 
-def test_out_and_back_without_control_uses_farthest_index():
+def test_out_and_back_without_stop_uses_farthest_index():
     # Out and back along a meridian: 0 → 1° N → back to start. Farthest is the apex.
     pts = _line([(0.0, 0.0), (0.5, 0.0), (1.0, 0.0), (0.5, 0.0), (0.0, 0.0)])
     t = detect_turnaround(pts, [])
     assert t is not None
-    assert t.control_idx is None
+    assert t.stop_idx is None
     assert t.index_before == 2
     assert t.index_after == 2
 
 
-def test_out_and_back_snaps_to_nearby_control():
-    # Same out-and-back, with a control parked at the apex (within 1km).
+def test_out_and_back_snaps_to_nearby_stop():
+    # Same out-and-back, with a stop parked at the apex (within 1km).
     pts = _line([(0.0, 0.0), (0.5, 0.0), (1.0, 0.0), (0.5, 0.0), (0.0, 0.0)])
-    controls = [
-        Control(index_before=2, index_after=2, lat=1.0, lng=0.0, time_before_s=120, time_after_s=720),
+    stops = [
+        Stop(index_before=2, index_after=2, lat=1.0, lng=0.0, time_before_s=120, time_after_s=720),
     ]
-    t = detect_turnaround(pts, controls)
+    t = detect_turnaround(pts, stops)
     assert t is not None
-    assert t.control_idx == 0
+    assert t.stop_idx == 0
     assert t.index_before == 2
     assert t.index_after == 2
 
 
-def test_far_control_does_not_snap():
-    # Control sits well away from the apex (>1km) — fall back to the farthest index.
+def test_far_stop_does_not_snap():
+    # Stop sits well away from the apex (>1km) — fall back to the farthest index.
     pts = _line([(0.0, 0.0), (0.5, 0.0), (1.0, 0.0), (0.5, 0.0), (0.0, 0.0)])
-    controls = [
-        Control(index_before=1, index_after=1, lat=0.5, lng=0.0, time_before_s=60, time_after_s=120),
+    stops = [
+        Stop(index_before=1, index_after=1, lat=0.5, lng=0.0, time_before_s=60, time_after_s=120),
     ]
-    t = detect_turnaround(pts, controls)
+    t = detect_turnaround(pts, stops)
     assert t is not None
-    assert t.control_idx is None
+    assert t.stop_idx is None
     assert t.index_before == 2
 
 
@@ -57,15 +57,15 @@ def test_point_to_point_returns_none():
     assert detect_turnaround(pts, []) is None
 
 
-def test_picks_nearest_of_multiple_candidate_controls():
-    # Two controls within snap range of the apex; the closer one wins.
+def test_picks_nearest_of_multiple_candidate_stops():
+    # Two stops within snap range of the apex; the closer one wins.
     pts = _line([(0.0, 0.0), (0.5, 0.0), (1.0, 0.0), (0.5, 0.0), (0.0, 0.0)])
-    controls = [
-        # ~1.1km north of apex — outside SNAP_TO_CONTROL_M, would not snap on its own
-        Control(index_before=2, index_after=2, lat=1.01, lng=0.0, time_before_s=120, time_after_s=180),
+    stops = [
+        # ~1.1km north of apex — outside SNAP_TO_STOP_M, would not snap on its own
+        Stop(index_before=2, index_after=2, lat=1.01, lng=0.0, time_before_s=120, time_after_s=180),
         # ~110m east of apex — clearly inside snap range
-        Control(index_before=2, index_after=2, lat=1.0, lng=0.001, time_before_s=200, time_after_s=300),
+        Stop(index_before=2, index_after=2, lat=1.0, lng=0.001, time_before_s=200, time_after_s=300),
     ]
-    t = detect_turnaround(pts, controls)
+    t = detect_turnaround(pts, stops)
     assert t is not None
-    assert t.control_idx == 1
+    assert t.stop_idx == 1

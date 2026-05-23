@@ -1,11 +1,11 @@
 # Rando Recap
 
-Per-control and per-segment analysis of randonneuring rides, from Strava
-activity streams. Controls are auto-detected from gaps in the recording (your
+Per-stop and per-segment analysis of randonneuring rides, from Strava
+activity streams. Stops are auto-detected from gaps in the recording (your
 Garmin pauses at stops, leaving gaps in the time stream).
 
 Runs as a local web app: a FastAPI server with a Leaflet-based single-page UI
-that renders a map, timeline, and per-control / per-segment tables, with
+that renders a map, timeline, and per-stop / per-segment tables, with
 linked hover across all three. The same analysis is also available from the
 CLI.
 
@@ -39,13 +39,13 @@ uv run app serve --reload              # dev: auto-reload on code change
 Routes:
 
 - `/` — ride list (filtered by minimum distance). Click a ride for the
-  analysis view: map, timeline, controls table, segments table.
+  analysis view: map, timeline, stops table, segments table.
 - `/api/rides` — JSON list of cached rides. Query: `min_distance_km`, `types`.
 - `/api/rides/{activity_id}/analysis` — JSON analysis. Query: `min_stop`,
   `refresh`.
 
 The analysis view shows a route polyline colored by day/night (using sunrise
-/ sunset for the ride's location and date), control markers, and a segment
+/ sunset for the ride's location and date), stop markers, and a segment
 timeline. Hovering any peer (table row, timeline bar, map element)
 highlights the others.
 
@@ -60,7 +60,7 @@ what you're doing. Populate the local cache with `uv run app fetch` first
 
 ```bash
 uv run app analyze <activity_id>
-uv run app analyze <activity_id> --min-stop 10m   # raise control threshold
+uv run app analyze <activity_id> --min-stop 10m   # raise stop threshold
 uv run app analyze <activity_id> --json           # structured output
 uv run app analyze <activity_id> --refresh        # bypass local cache
 ```
@@ -69,10 +69,10 @@ uv run app analyze <activity_id> --refresh        # bypass local cache
 
 The terminal report shows:
 
-- **Controls** — clock time arriving / departing / dwell, with lat,lng.
+- **Stops** — clock time arriving / departing / dwell, with lat,lng.
 - **Segments** — distance, time, avg km/h, avg HR, avg cadence, avg power,
   climb (m), climb m/km. Within a segment elapsed time = moving time, since
-  paused intervals only appear at controls.
+  paused intervals only appear at stops.
 
 ### Bulk-cache rides
 

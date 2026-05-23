@@ -16,7 +16,7 @@ from platformdirs import user_cache_dir, user_config_dir
 from .cache import Cache
 from .daynight import Stretch, build_stretches
 from .segments import Segment, build_segments
-from .stops import Control, detect_controls, merge_nearby_controls
+from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
 from .turnaround import Turnaround, detect_turnaround
 
@@ -103,7 +103,7 @@ def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int,
 class AnalysisResult:
     activity: dict[str, Any]
     streams: dict[str, Any]
-    controls: list[Control]
+    stops: list[Stop]
     segments: list[Segment]
     daynight: list[Stretch]
     turnaround: Turnaround | None
@@ -126,24 +126,24 @@ def _analyze_core(
 ) -> AnalysisResult:
     if "time" not in streams or "latlng" not in streams:
         raise MissingStreamsError("Activity is missing 'time' or 'latlng' streams (no GPS?).")
-    controls = detect_controls(
+    stops = detect_stops(
         time_s=streams["time"]["data"],
         latlng=streams["latlng"]["data"],
         min_stop_s=min_stop_s,
     )
-    controls = merge_nearby_controls(
-        controls,
+    stops = merge_nearby_stops(
+        stops,
         distance_m=streams["distance"]["data"],
         merge_within_m=merge_within_m,
     )
-    segments = build_segments(streams, controls)
+    segments = build_segments(streams, stops)
     daynight = build_stretches(
         streams,
         activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
         utc_offset_s=int(activity.get("utc_offset") or 0),
     )
-    turnaround = detect_turnaround(streams["latlng"]["data"], controls)
-    return AnalysisResult(activity, streams, controls, segments, daynight, turnaround)
+    turnaround = detect_turnaround(streams["latlng"]["data"], stops)
+    return AnalysisResult(activity, streams, stops, segments, daynight, turnaround)
 
 
 def analyze_activity(
@@ -166,7 +166,7 @@ def analyze_activity(
 # Multi-day brevets often appear in Strava as separate per-day uploads. We
 # stitch them into one synthetic activity so the analysis pipeline sees a
 # single ride. Inter-activity gaps (e.g. overnight sleep) are preserved as
-# real time-stream gaps, which detect_controls picks up as control stops.
+# real time-stream gaps, which detect_stops picks up as stops.
 
 COMBINED_ID_PREFIX = "combined:"
 

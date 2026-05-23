@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from .app import AnalysisResult
     from .segments import Segment
-    from .stops import Control
+    from .stops import Stop
 
 
 def _fmt_dur(seconds: int | float | None) -> str:
@@ -101,20 +101,20 @@ def _segment_lines(s: Segment | None) -> list[str]:
     return list(_segment_cells(s))
 
 
-def _end_seconds(controls: list[Control], ordered_segs: list[Segment | None]) -> int:
-    if controls:
+def _end_seconds(stops: list[Stop], ordered_segs: list[Segment | None]) -> int:
+    if stops:
         last_seg = ordered_segs[-1]
-        return controls[-1].time_after_s + (last_seg.duration_s if last_seg else 0)
+        return stops[-1].time_after_s + (last_seg.duration_s if last_seg else 0)
     return ordered_segs[0].duration_s if ordered_segs[0] else 0
 
 
 def _stops_segments_cumkm(
-    controls: list[Control], segments: list[Segment]
+    stops: list[Stop], segments: list[Segment]
 ) -> tuple[list[str], list[Segment | None], list[float]]:
     # Stable lookup so zero-length segments (skipped by build_segments) become None slots.
-    n = len(controls)
+    n = len(stops)
     seg_by_label = {s.label: s for s in segments}
-    stop_labels = ["Start"] + [f"C{i + 1}" for i in range(n)] + ["End"]
+    stop_labels = ["Start"] + [f"S{i + 1}" for i in range(n)] + ["End"]
     seg_labels = [f"{stop_labels[i]} → {stop_labels[i + 1]}" for i in range(n + 1)]
     ordered_segs = [seg_by_label.get(lab) for lab in seg_labels]
     cum_km = [0.0]
@@ -126,14 +126,14 @@ def _stops_segments_cumkm(
 def render_chart(
     console: Console,
     fmt_clock: Callable[[int], str],
-    controls: list[Control],
+    stops: list[Stop],
     stop_labels: list[str],
     ordered_segs: list[Segment | None],
     cum_km: list[float],
 ) -> None:
     """Horizontal stop/segment diagram. Stops above the track, segments below."""
-    n = len(controls)
-    end_s = _end_seconds(controls, ordered_segs)
+    n = len(stops)
+    end_s = _end_seconds(stops, ordered_segs)
 
     stop_blocks: list[list[str]] = []
     for i, label in enumerate(stop_labels):
@@ -142,7 +142,7 @@ def render_chart(
         elif label == "End":
             arrive, depart, rest = fmt_clock(end_s), None, 0
         else:
-            c = controls[i - 1]
+            c = stops[i - 1]
             arrive = fmt_clock(c.time_before_s)
             depart = fmt_clock(c.time_after_s)
             rest = c.rest_s
@@ -228,7 +228,7 @@ def render_chart(
 
 def render_terminal(
     activity: dict[str, Any],
-    controls: list[Control],
+    stops: list[Stop],
     segments: list[Segment],
 ) -> None:
     console = Console()
@@ -256,19 +256,19 @@ def render_terminal(
         )
     )
 
-    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(controls, segments)
-    render_chart(console, fmt_clock, controls, stop_labels, ordered_segs, cum_km)
+    stop_labels, ordered_segs, cum_km = _stops_segments_cumkm(stops, segments)
+    render_chart(console, fmt_clock, stops, stop_labels, ordered_segs, cum_km)
 
-    if controls:
-        ct = Table(title="Controls", box=box.HORIZONTALS)
+    if stops:
+        ct = Table(title="Stops", box=box.HORIZONTALS)
         ct.add_column("#")
         ct.add_column("Dist (km)", justify="right")
         ct.add_column("Arrive")
         ct.add_column("Depart")
         ct.add_column("Rest", justify="right")
-        for i, c in enumerate(controls, start=1):
+        for i, c in enumerate(stops, start=1):
             ct.add_row(
-                f"C{i}",
+                f"S{i}",
                 f"{cum_km[i]:.1f}",
                 fmt_clock(c.time_before_s),
                 fmt_clock(c.time_after_s),
@@ -317,7 +317,7 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
             "moving_time_s": activity.get("moving_time"),
             "total_elevation_gain_m": activity.get("total_elevation_gain"),
         },
-        "controls": [{**asdict(c), "rest_s": c.rest_s} for c in result.controls],
+        "stops": [{**asdict(c), "rest_s": c.rest_s} for c in result.stops],
         "segments": [asdict(s) for s in result.segments],
         "daynight": [asdict(s) for s in result.daynight],
         "turnaround": asdict(result.turnaround) if result.turnaround else None,

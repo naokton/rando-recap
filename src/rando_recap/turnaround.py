@@ -1,8 +1,8 @@
 """Turnaround detection for out-and-back rides.
 
-Picks the GPS sample farthest from the start, snapping to a nearby control
-when one is within :data:`SNAP_TO_CONTROL_M` so the split aligns with the
-control list. Returns ``None`` for routes that don't look out-and-back
+Picks the GPS sample farthest from the start, snapping to a nearby stop
+when one is within :data:`SNAP_TO_STOP_M` so the split aligns with the
+stop list. Returns ``None`` for routes that don't look out-and-back
 (end is far from start) — splitting those produces lopsided halves.
 """
 
@@ -13,14 +13,14 @@ from math import asin, cos, radians, sin, sqrt
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .stops import Control
+    from .stops import Stop
 
 # End must return to within this fraction of the farthest distance for the
 # route to count as out-and-back. 0.25 admits typical brevets (start == end,
 # ratio ≈ 0) and rejects point-to-point rides.
 OUT_AND_BACK_END_RATIO = 0.25
 
-SNAP_TO_CONTROL_M = 1000.0
+SNAP_TO_STOP_M = 1000.0
 
 _EARTH_RADIUS_M = 6_371_000.0
 
@@ -29,8 +29,8 @@ _EARTH_RADIUS_M = 6_371_000.0
 class Turnaround:
     index_before: int
     index_after: int
-    """Equals ``index_before`` when not snapped to a control (single GPS point)."""
-    control_idx: int | None
+    """Equals ``index_before`` when not snapped to a stop (single GPS point)."""
+    stop_idx: int | None
 
 
 def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -42,7 +42,7 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 def detect_turnaround(
     latlng: list[list[float]],
-    controls: list[Control],
+    stops: list[Stop],
 ) -> Turnaround | None:
     if not latlng or len(latlng) < 2:
         return None
@@ -64,14 +64,14 @@ def detect_turnaround(
 
     lat_f, lng_f = latlng[farthest_idx]
     snap_idx: int | None = None
-    snap_dist = SNAP_TO_CONTROL_M
-    for k, c in enumerate(controls):
+    snap_dist = SNAP_TO_STOP_M
+    for k, c in enumerate(stops):
         d = _haversine_m(lat_f, lng_f, c.lat, c.lng)
         if d < snap_dist:
             snap_dist = d
             snap_idx = k
 
     if snap_idx is not None:
-        c = controls[snap_idx]
-        return Turnaround(index_before=c.index_before, index_after=c.index_after, control_idx=snap_idx)
-    return Turnaround(index_before=farthest_idx, index_after=farthest_idx, control_idx=None)
+        c = stops[snap_idx]
+        return Turnaround(index_before=c.index_before, index_after=c.index_after, stop_idx=snap_idx)
+    return Turnaround(index_before=farthest_idx, index_after=farthest_idx, stop_idx=None)

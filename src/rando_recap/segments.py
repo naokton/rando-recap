@@ -1,7 +1,7 @@
-"""Per-segment statistics between detected controls.
+"""Per-segment statistics between detected stops.
 
-A "segment" is a contiguous portion of the ride between two controls (or
-between the start/end and the nearest control). Within a segment there are
+A "segment" is a contiguous portion of the ride between two stops (or
+between the start/end and the nearest stop). Within a segment there are
 no recording gaps, so elapsed time = moving time.
 """
 
@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .stops import Control
+    from .stops import Stop
 
 
 @dataclass
 class Segment:
     label: str
-    """e.g. "Start → C1", "C1 → C2", "C3 → End"."""
+    """e.g. "Start → S1", "S1 → S2", "S3 → End"."""
     index_start: int
     index_end: int
     distance_m: float
@@ -59,7 +59,7 @@ def _climb_sum(altitude: list[float] | None, lo: int, hi: int) -> float:
 
 def build_segments(
     streams: dict[str, dict],
-    controls: list[Control],
+    stops: list[Stop],
 ) -> list[Segment]:
     """Build ordered segments from streams keyed by type (Strava ``key_by_type=true``)."""
     time_s: list[int] = streams["time"]["data"]
@@ -78,9 +78,9 @@ def build_segments(
     boundaries: list[tuple[str, int, int]] = []
     prev_label = "Start"
     prev_idx = 0
-    for i, c in enumerate(controls, start=1):
-        boundaries.append((f"{prev_label} → C{i}", prev_idx, c.index_before))
-        prev_label = f"C{i}"
+    for i, c in enumerate(stops, start=1):
+        boundaries.append((f"{prev_label} → S{i}", prev_idx, c.index_before))
+        prev_label = f"S{i}"
         prev_idx = c.index_after
     boundaries.append((f"{prev_label} → End", prev_idx, last))
 

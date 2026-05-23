@@ -1,4 +1,4 @@
-"""Stop/control detection from Strava streams.
+"""Stop detection from Strava streams.
 
 Garmin (and most head units) pause recording during stops, so the ``time``
 stream has gaps where the device was paused. A stop is therefore a gap
@@ -11,8 +11,8 @@ from dataclasses import dataclass, replace
 
 
 @dataclass
-class Control:
-    """A detected stop, treated as a control."""
+class Stop:
+    """A detected stop."""
 
     index_before: int
     """Last sample index before the pause."""
@@ -30,20 +30,20 @@ class Control:
         return self.time_after_s - self.time_before_s
 
 
-def detect_controls(
+def detect_stops(
     time_s: list[int],
     latlng: list[list[float]],
     min_stop_s: int,
-) -> list[Control]:
+) -> list[Stop]:
     if len(time_s) != len(latlng):
         raise ValueError(f"time/latlng length mismatch: {len(time_s)} vs {len(latlng)}")
-    controls: list[Control] = []
+    stops: list[Stop] = []
     for i in range(1, len(time_s)):
         gap = time_s[i] - time_s[i - 1]
         if gap >= min_stop_s:
             lat, lng = latlng[i - 1]
-            controls.append(
-                Control(
+            stops.append(
+                Stop(
                     index_before=i - 1,
                     index_after=i,
                     lat=lat,
@@ -52,23 +52,23 @@ def detect_controls(
                     time_after_s=time_s[i],
                 )
             )
-    return controls
+    return stops
 
 
-def merge_nearby_controls(
-    controls: list[Control],
+def merge_nearby_stops(
+    stops: list[Stop],
     distance_m: list[float],
     merge_within_m: float,
-) -> list[Control]:
-    """Coalesce adjacent controls within `merge_within_m` of path distance.
+) -> list[Stop]:
+    """Coalesce adjacent stops within `merge_within_m` of path distance.
 
     Path distance (not straight-line) so an out-and-back to the same store
-    stays as two controls — only stops linked by a short in-area walk merge.
+    stays as two stops — only stops linked by a short in-area walk merge.
     """
-    if not controls or merge_within_m <= 0:
-        return list(controls)
-    merged: list[Control] = [controls[0]]
-    for c in controls[1:]:
+    if not stops or merge_within_m <= 0:
+        return list(stops)
+    merged: list[Stop] = [stops[0]]
+    for c in stops[1:]:
         prev = merged[-1]
         gap_m = distance_m[c.index_before] - distance_m[prev.index_after]
         if gap_m <= merge_within_m:
