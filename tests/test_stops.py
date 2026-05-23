@@ -54,7 +54,20 @@ def test_merge_keeps_out_and_back_separate():
     # Same store visited twice, with a long ride between. Path distance is large
     # even though the lat/lng of the two stops is identical.
     stops = [_stop(1, 2, 100, 400), _stop(10, 11, 5000, 5300)]
-    distance_m = [0.0, 1000.0, 1000.0, 11000.0, 12000.0, 13000.0, 14000.0, 15000.0, 16000.0, 17000.0, 21000.0, 21000.0]
+    distance_m = [
+        0.0,
+        1000.0,
+        1000.0,
+        11000.0,
+        12000.0,
+        13000.0,
+        14000.0,
+        15000.0,
+        16000.0,
+        17000.0,
+        21000.0,
+        21000.0,
+    ]
     merged = merge_nearby_stops(stops, distance_m, merge_within_m=100.0)
     assert len(merged) == 2
 

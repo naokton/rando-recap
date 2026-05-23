@@ -209,9 +209,7 @@ def combine_activities(
             raise MissingStreamsError(
                 f"Activity {activity.get('id')} is missing 'time' or 'latlng' streams (no GPS?).",
             )
-        time_offset_s = int(
-            (datetime.fromisoformat(activity["start_date"]) - first_start).total_seconds()
-        )
+        time_offset_s = int((datetime.fromisoformat(activity["start_date"]) - first_start).total_seconds())
         _append("time", streams["time"], (t + time_offset_s for t in streams["time"]["data"]))
         if "distance" in streams:
             data = streams["distance"]["data"]
@@ -223,9 +221,7 @@ def combine_activities(
                 _append(key, streams[key], streams[key]["data"])
 
     last_act = parts[-1][0]
-    last_start = (
-        first_start if len(parts) == 1 else datetime.fromisoformat(last_act["start_date"])
-    )
+    last_start = first_start if len(parts) == 1 else datetime.fromisoformat(last_act["start_date"])
     elapsed_combined = int(
         (last_start - first_start).total_seconds() + int(last_act.get("elapsed_time") or 0)
     )

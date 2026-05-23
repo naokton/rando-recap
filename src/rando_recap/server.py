@@ -63,16 +63,12 @@ def _parse_activity_id(activity_id: str) -> int | list[int]:
                 status_code=400, detail=f"Invalid combined activity id: {activity_id!r}"
             ) from e
         if not ids:
-            raise HTTPException(
-                status_code=400, detail=f"Combined id has no activities: {activity_id!r}"
-            )
+            raise HTTPException(status_code=400, detail=f"Combined id has no activities: {activity_id!r}")
         return ids
     try:
         return int(activity_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid activity id: {activity_id!r}"
-        ) from e
+        raise HTTPException(status_code=400, detail=f"Invalid activity id: {activity_id!r}") from e
 
 
 @app.get("/api/rides/{activity_id}/analysis")

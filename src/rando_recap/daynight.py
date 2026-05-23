@@ -25,12 +25,43 @@ from astral.sun import sun
 
 State = Literal["day", "twilight", "night"]
 
+# A recording pause (stop) shows up as an inter-sample time delta far larger
+# than the device's normal cadence. Deltas above max(floor, factor * median)
+# are treated as gaps and excluded from ride duration, so the figures don't
+# depend on the stop-detection threshold.
+_GAP_CADENCE_FACTOR = 5
+_GAP_FLOOR_S = 5
+
 
 @dataclass(frozen=True)
 class Stretch:
     state: State
     index_start: int
     index_end: int
+
+
+def ride_seconds(time_s: list[int], stretches: list[Stretch]) -> list[int]:
+    """Riding seconds per stretch, excluding recording-gap (pause) time.
+
+    Returns a list parallel to ``stretches``. Adjacent stretches share a
+    boundary index, but each interval is counted by its end index so no time
+    is double-counted across the seam.
+    """
+    n = len(time_s)
+    if n < 2:
+        return [0 for _ in stretches]
+    deltas = sorted(time_s[i] - time_s[i - 1] for i in range(1, n))
+    median = deltas[len(deltas) // 2]
+    gap_threshold = max(_GAP_FLOOR_S, _GAP_CADENCE_FACTOR * median)
+    out: list[int] = []
+    for s in stretches:
+        total = 0
+        for i in range(s.index_start + 1, s.index_end + 1):
+            d = time_s[i] - time_s[i - 1]
+            if d <= gap_threshold:
+                total += d
+        out.append(total)
+    return out
 
 
 Classifier = Callable[[datetime], State]

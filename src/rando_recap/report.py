@@ -13,6 +13,8 @@ from rich.padding import Padding
 from rich.panel import Panel
 from rich.table import Table
 
+from .daynight import ride_seconds
+
 LEFT_PAD = 2
 _PAD = (0, 0, 0, LEFT_PAD)
 _PAD_PREFIX = " " * LEFT_PAD
@@ -305,6 +307,11 @@ def render_terminal(
 
 def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dict[str, Any]:
     activity = result.activity
+    time_s = result.streams.get("time", {}).get("data") or []
+    ride_s = ride_seconds(time_s, result.daynight)
+    daynight_s = {"day": 0, "twilight": 0, "night": 0}
+    for s, d in zip(result.daynight, ride_s, strict=True):
+        daynight_s[s.state] += d
     payload: dict[str, Any] = {
         "activity": {
             "id": activity.get("id"),
@@ -315,6 +322,9 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
             "distance_m": activity.get("distance"),
             "elapsed_time_s": activity.get("elapsed_time"),
             "moving_time_s": activity.get("moving_time"),
+            "moving_day_time_s": daynight_s["day"],
+            "moving_twilight_time_s": daynight_s["twilight"],
+            "moving_night_time_s": daynight_s["night"],
             "total_elevation_gain_m": activity.get("total_elevation_gain"),
         },
         "stops": [{**asdict(c), "rest_s": c.rest_s} for c in result.stops],

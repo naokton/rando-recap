@@ -1015,8 +1015,8 @@ function addMapLegend(map, hasStops) {
 function addFullscreenControl(map, container, bounds) {
   let escHandler = null;
   const setOn = addStatefulButton(map, {
-    className: "fullscreen-btn", 
-   labelOn: "⇱",
+    className: "fullscreen-btn",
+    labelOn: "⇱",
     labelOff: "⛶",
     titleOn: "Exit fullscreen",
     titleOff: "Toggle fullscreen",
@@ -1088,24 +1088,37 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     ),
   );
 
-  const summaryItems = [
-    ["Distance", `${(a.distance_m / 1000).toFixed(1)} km`],
-    ["Elapsed", fmtDur(a.elapsed_time_s)],
-    ["Moving", fmtDur(a.moving_time_s)],
-    ["Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`],
+  const item = (label, value) =>
+    el(
+      "div",
+      { class: "item" },
+      el("span", { class: "label" }, `${label}:`),
+      el("span", { class: "value" }, value),
+    );
+
+  const summaryRows = [
+    [
+      item("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
+      item("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+    ],
+    [item("Elapsed", fmtDur(a.elapsed_time_s))],
+    [
+      item("Moving", fmtDur(a.moving_time_s)),
+      el(
+        "div",
+        { class: "item-group" },
+        item("Day", fmtDur(a.moving_day_time_s)),
+        item("Twilight", fmtDur(a.moving_twilight_time_s)),
+        item("Night", fmtDur(a.moving_night_time_s)),
+      ),
+    ],
+    [item("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s))],
   ];
   root.appendChild(
     el(
       "div",
       { class: "summary" },
-      summaryItems.map(([label, value]) =>
-        el(
-          "div",
-          { class: "item" },
-          el("span", { class: "label" }, `${label}:`),
-          el("span", { class: "value" }, value),
-        ),
-      ),
+      summaryRows.map((row) => el("div", { class: "summary-row" }, row)),
     ),
   );
 

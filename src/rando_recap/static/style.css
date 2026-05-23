@@ -220,9 +220,19 @@ table.rides.merge-mode tbody tr.selected:hover {
 
 .summary {
   display: flex;
-  flex-wrap: wrap;
-  gap: 16px 28px;
+  flex-direction: column;
+  gap: 8px;
   margin: 8px 0 16px;
+}
+.summary-row,
+.summary .item-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 28px;
+}
+.summary .item-group {
+  gap: 8px 20px;
 }
 .summary .item {
   font-variant-numeric: tabular-nums;
