@@ -209,6 +209,48 @@ function parseMergeWithin(s) {
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MERGE_WITHIN_M;
 }
 
+// Toolbar popover holding the rides-list filters (currently just minimum
+// distance). Applying routes via the hash so the list re-fetches through route().
+function buildFilterControl(minDist) {
+  const active = minDist !== DEFAULT_MIN_DIST_KM;
+  const input = el("input", { type: "number", min: "0", step: "10", value: minDist });
+  const form = el(
+    "form",
+    { class: "filter-panel" },
+    el("div", { class: "field" }, el("label", {}, "Min distance"), input, el("span", { class: "unit" }, "km")),
+    el("div", { class: "filter-footer" }, el("button", { type: "submit", class: "btn primary" }, "Apply")),
+  );
+  const btn = el(
+    "button",
+    { class: `btn filter-btn${active ? " active" : ""}`, type: "button", onclick: () => toggle() },
+    "Filter",
+  );
+  const wrap = el("div", { class: "filter-wrap" }, btn, form);
+
+  const close = () => {
+    wrap.classList.remove("open");
+    document.removeEventListener("mousedown", onOutside);
+  };
+  const onOutside = (e) => {
+    if (!wrap.contains(e.target)) close();
+  };
+  // Opening on click means the triggering mousedown already fired, so the
+  // outside-click listener can be added immediately without re-closing.
+  function toggle() {
+    if (wrap.classList.toggle("open")) document.addEventListener("mousedown", onOutside);
+    else close();
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    close();
+    const next = parseMinDist(input.value);
+    if (next !== minDist) setHash({ min_dist: next });
+  });
+
+  return wrap;
+}
+
 async function renderList(minDist) {
   saveUserParams({ minDist });
   root.innerHTML = "";
@@ -228,6 +270,7 @@ async function renderList(minDist) {
 
   if (!data.rides.length) {
     body.replaceChildren(
+      el("div", { class: "list-toolbar" }, buildFilterControl(minDist)),
       el(
         "div",
         { class: "empty" },
@@ -243,6 +286,8 @@ async function renderList(minDist) {
   const selected = new Set();
 
   const toolbar = el("div", { class: "list-toolbar" });
+  const mergeControls = el("div", { class: "merge-controls" });
+  toolbar.append(buildFilterControl(minDist), mergeControls);
   const table = el("table", { class: "rides" });
   body.replaceChildren(toolbar, table);
 
@@ -264,9 +309,9 @@ async function renderList(minDist) {
   };
 
   const renderToolbar = () => {
-    toolbar.replaceChildren();
+    mergeControls.replaceChildren();
     if (!mergeMode) {
-      toolbar.appendChild(
+      mergeControls.appendChild(
         el(
           "button",
           {
@@ -293,7 +338,7 @@ async function renderList(minDist) {
       selected.size >= 2 ? `Open (${selected.size})` : "Open",
     );
     if (selected.size < 2) openBtn.setAttribute("disabled", "");
-    toolbar.appendChild(
+    mergeControls.appendChild(
       el(
         "button",
         {
@@ -309,7 +354,7 @@ async function renderList(minDist) {
         "Cancel",
       ),
     );
-    toolbar.appendChild(openBtn);
+    mergeControls.appendChild(openBtn);
   };
 
   const renderTable = () => {
@@ -1207,13 +1252,11 @@ route();
 (function setupConfigDialog() {
   const dialog = document.getElementById("config-dialog");
   const form = document.getElementById("config-form");
-  const minDistInput = document.getElementById("cfg-min-dist");
   const minStopInput = document.getElementById("cfg-min-stop");
   const mergeInput = document.getElementById("cfg-merge");
 
   document.getElementById("config-btn").addEventListener("click", () => {
     const saved = loadUserParams();
-    minDistInput.value = saved.minDist;
     minStopInput.value = saved.minStop;
     mergeInput.value = saved.mergeWithinM;
     dialog.showModal();
@@ -1223,23 +1266,21 @@ route();
 
   form.addEventListener("submit", (e) => {
     e.preventDefault();
-    const minDist = parseMinDist(minDistInput.value);
     const minStop = minStopInput.value.trim() || DEFAULT_MIN_STOP;
     const mergeWithinM = parseMergeWithin(mergeInput.value);
 
     // Capture currently-rendered params *before* saving so we can detect
-    // whether the change actually affects this view — settings for the
-    // other view get persisted but should not trigger a re-fetch here.
+    // whether the change actually affects this view — these are analysis
+    // params, so a list view gets the new values persisted but no re-fetch.
     const before = parseHash();
-    saveUserParams({ minDist, minStop, mergeWithinM });
+    saveUserParams({ minStop, mergeWithinM });
     dialog.close();
 
-    if (before.view === "analysis") {
-      if (before.minStop !== minStop || before.mergeWithinM !== mergeWithinM) {
-        setHash({ ride: before.rideId, min_stop: minStop, merge_within_m: mergeWithinM });
-      }
-    } else if (before.minDist !== minDist) {
-      setHash({ min_dist: minDist });
+    if (
+      before.view === "analysis" &&
+      (before.minStop !== minStop || before.mergeWithinM !== mergeWithinM)
+    ) {
+      setHash({ ride: before.rideId, min_stop: minStop, merge_within_m: mergeWithinM });
     }
   });
 })();

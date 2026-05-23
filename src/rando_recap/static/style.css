@@ -94,21 +94,17 @@ main {
 #config-dialog .dlg-body {
   padding: 6px 20px;
 }
-#config-dialog .field {
+.field {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid var(--border);
 }
-#config-dialog .field:last-child {
-  border-bottom: none;
-}
-#config-dialog .field label {
+.field label {
   color: var(--muted);
   flex: 0 0 110px;
 }
-#config-dialog .field input {
+.field input {
   flex: 1;
   min-width: 0;
   padding: 5px 8px;
@@ -117,9 +113,16 @@ main {
   font: inherit;
   font-variant-numeric: tabular-nums;
 }
-#config-dialog .field .unit {
+.field .unit {
   color: var(--muted);
   width: 1.4em;
+}
+/* Dividers between settings rows; the filter popover has a single field. */
+#config-dialog .field {
+  border-bottom: 1px solid var(--border);
+}
+#config-dialog .field:last-child {
+  border-bottom: none;
 }
 #config-dialog .dlg-footer {
   display: flex;
@@ -162,6 +165,40 @@ main {
   gap: 8px;
   margin-bottom: 12px;
   max-width: 900px;
+}
+.merge-controls {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Filter popover */
+.filter-wrap {
+  position: relative;
+}
+.filter-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.filter-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  min-width: 240px;
+  padding: 6px 16px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+.filter-wrap.open .filter-panel {
+  display: block;
+}
+.filter-footer {
+  display: flex;
+  justify-content: flex-end;
 }
 table.rides {
   border-collapse: collapse;
