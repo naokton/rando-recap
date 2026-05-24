@@ -290,8 +290,6 @@ async function renderList(minDist) {
     return;
   }
 
-  const { minStop: rideMinStop, mergeWithinM: rideMergeWithin } = loadUserParams();
-
   if (!data.rides.length) {
     body.replaceChildren(
       el("div", { class: "list-toolbar" }, buildFilterControl(minDist)),
@@ -315,12 +313,10 @@ async function renderList(minDist) {
   const table = el("table", { class: "rides" });
   body.replaceChildren(toolbar, table);
 
-  const rideHash = (rideId) =>
-    `#${new URLSearchParams({
-      ride: rideId,
-      min_stop: rideMinStop,
-      merge_within_m: rideMergeWithin,
-    })}`;
+  // Link only the ride id; analysis params are filled from saved prefs by
+  // parseHash at navigation time. Baking them into the href here would
+  // capture them at render time and ignore later Settings changes.
+  const rideHash = (rideId) => `#${new URLSearchParams({ ride: rideId })}`;
 
   const openCombined = () => {
     if (selected.size < 2) return;
@@ -1269,12 +1265,13 @@ function parseHash() {
   const params = new URLSearchParams(h);
   const ride = params.get("ride");
   if (ride) {
-    const mergeParam = params.get("merge_within_m");
+    // min_stop / merge_within_m are app config (persisted prefs), not URL
+    // state, so the hash carries only the ride id.
     return {
       view: "analysis",
       rideId: ride,
-      minStop: params.get("min_stop") || saved.minStop,
-      mergeWithinM: mergeParam != null ? parseMergeWithin(mergeParam) : saved.mergeWithinM,
+      minStop: saved.minStop,
+      mergeWithinM: saved.mergeWithinM,
     };
   }
   const minDistParam = params.get("min_dist");
@@ -1344,7 +1341,7 @@ route();
 
     // Capture currently-rendered params *before* saving so we can detect
     // whether the change actually affects this view — these are analysis
-    // params, so a list view gets the new values persisted but no re-fetch.
+    // params, so a list view just persists them and needs no re-render.
     const before = parseHash();
     saveUserParams({ minStop, mergeWithinM });
     dialog.close();
@@ -1353,7 +1350,9 @@ route();
       before.view === "analysis" &&
       (before.minStop !== minStop || before.mergeWithinM !== mergeWithinM)
     ) {
-      setHash({ ride: before.rideId, min_stop: minStop, merge_within_m: mergeWithinM });
+      // The hash is unchanged (config lives in saved prefs, not the URL), so
+      // re-render explicitly to re-analyze with the new values.
+      route();
     }
   });
 })();
