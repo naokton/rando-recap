@@ -64,6 +64,14 @@ def ride_seconds(time_s: list[int], stretches: list[Stretch]) -> list[int]:
     return out
 
 
+def seconds_by_state(time_s: list[int], stretches: list[Stretch]) -> dict[State, int]:
+    """Total riding seconds per state, excluding recording-gap (pause) time."""
+    out: dict[State, int] = {"day": 0, "twilight": 0, "night": 0}
+    for stretch, secs in zip(stretches, ride_seconds(time_s, stretches), strict=True):
+        out[stretch.state] += secs
+    return out
+
+
 Classifier = Callable[[datetime], State]
 
 

@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from platformdirs import user_cache_dir, user_config_dir
 
 from .cache import Cache
-from .daynight import Stretch, build_stretches
+from .daynight import State, Stretch, build_stretches, seconds_by_state
 from .segments import Segment, build_segments
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
@@ -106,6 +106,7 @@ class AnalysisResult:
     stops: list[Stop]
     segments: list[Segment]
     daynight: list[Stretch]
+    daynight_seconds: dict[State, int]
     turnaround: Turnaround | None
 
 
@@ -142,8 +143,9 @@ def _analyze_core(
         activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
         utc_offset_s=int(activity.get("utc_offset") or 0),
     )
+    daynight_seconds = seconds_by_state(streams["time"]["data"], daynight)
     turnaround = detect_turnaround(streams["latlng"]["data"], stops)
-    return AnalysisResult(activity, streams, stops, segments, daynight, turnaround)
+    return AnalysisResult(activity, streams, stops, segments, daynight, daynight_seconds, turnaround)
 
 
 def analyze_activity(
