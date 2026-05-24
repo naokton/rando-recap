@@ -18,7 +18,8 @@ from .app import (
     list_summaries,
     parse_duration,
 )
-from .report import render_json, render_terminal
+from .payload import render_json
+from .report import render_terminal
 from .strava import StravaClient, StravaRateLimitError, StravaScopeError
 
 

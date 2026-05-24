@@ -20,7 +20,7 @@ from .app import (
     list_summaries,
     parse_duration,
 )
-from .report import build_payload
+from .payload import build_payload
 from .strava import StravaScopeError
 
 STATIC_DIR = Path(__file__).parent / "static"
