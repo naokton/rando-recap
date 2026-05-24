@@ -45,7 +45,17 @@ header a:hover {
 /* Lucide icons (lucide-static @1.16.0, ISC) rendered via CSS mask: the SVG is
    the alpha mask and `background-color: currentColor` paints it, so icons pick
    up the surrounding text color — including theme vars and :hover. Each button
-   sets its glyph through the --icon custom property on a ::before pseudo. */
+   sets its glyph through the --icon custom property on a ::before pseudo; the
+   shared rule below carries the mask plumbing so each only needs --icon + size. */
+.config-btn::before,
+.filter-btn::before,
+.fullscreen-btn::before {
+  content: "";
+  display: block;
+  background-color: currentColor;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+  mask: var(--icon) center / contain no-repeat;
+}
 .config-btn {
   margin-left: auto;
   background: var(--bg);
@@ -60,13 +70,9 @@ header a:hover {
   justify-content: center;
 }
 .config-btn::before {
-  content: "";
   width: 24px;
   height: 24px;
-  background-color: currentColor;
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/settings.svg");
-  -webkit-mask: var(--icon) center / contain no-repeat;
-  mask: var(--icon) center / contain no-repeat;
 }
 .config-btn:hover {
   background: var(--bg-soft);
@@ -227,13 +233,9 @@ main {
   padding: 6px 10px;
 }
 .filter-btn::before {
-  content: "";
   width: 18px;
   height: 18px;
-  background-color: currentColor;
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/filter.svg");
-  -webkit-mask: var(--icon) center / contain no-repeat;
-  mask: var(--icon) center / contain no-repeat;
 }
 .filter-btn.active {
   border-color: var(--accent);
@@ -552,14 +554,9 @@ body.map-fullscreen-active {
   justify-content: center;
 }
 .fullscreen-btn::before {
-  content: "";
-  display: block;
   width: 20px;
   height: 20px;
-  background-color: currentColor;
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/maximize.svg");
-  -webkit-mask: var(--icon) center / contain no-repeat;
-  mask: var(--icon) center / contain no-repeat;
 }
 .fullscreen-btn.is-fullscreen::before {
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/minimize.svg");
