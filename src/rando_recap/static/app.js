@@ -538,11 +538,23 @@ function renderTimeline(activity, stops, model) {
 }
 
 // --- tables ------------------------------------------------------------
-function renderStopsTable(activity, stops, cumKm) {
-  if (!stops.length) {
-    return el("div", { class: "empty" }, "No stops above threshold detected.");
-  }
+function renderStopsTable(activity, stops, model) {
+  const { cumKm, endS } = model;
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
+  // Bookend the stops with Start/End rows so the table lines up row-for-row
+  // with the Segments table beside it (Start, Start→S1, S1, S1→S2, …). They
+  // carry the same data-stop keys as the timeline/map peers ("start"/"end"),
+  // so linked hover highlighting works without extra wiring.
+  const row = (key, label, km, arrive, depart, rest) =>
+    el(
+      "tr",
+      { class: "row", "data-stop": key },
+      el("td", {}, label),
+      el("td", {}, km),
+      el("td", {}, arrive),
+      el("td", {}, depart),
+      el("td", {}, rest),
+    );
   return el(
     "table",
     { class: "data" },
@@ -562,17 +574,18 @@ function renderStopsTable(activity, stops, cumKm) {
     el(
       "tbody",
       {},
+      row("start", "Start", cumKm[0].toFixed(1), "-", fmtClock(0), "-"),
       stops.map((c, i) =>
-        el(
-          "tr",
-          { class: "row", "data-stop": `c${i}` },
-          el("td", {}, `S${i + 1}`),
-          el("td", {}, cumKm[i + 1].toFixed(1)),
-          el("td", {}, fmtClock(c.time_before_s)),
-          el("td", {}, fmtClock(c.time_after_s)),
-          el("td", {}, fmtDur(c.rest_s)),
+        row(
+          `c${i}`,
+          `S${i + 1}`,
+          cumKm[i + 1].toFixed(1),
+          fmtClock(c.time_before_s),
+          fmtClock(c.time_after_s),
+          fmtDur(c.rest_s),
         ),
       ),
+      row("end", "End", cumKm[cumKm.length - 1].toFixed(1), fmtClock(endS), "-", "-"),
     ),
   );
 }
@@ -1251,7 +1264,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
         "section",
         {},
         el("h2", {}, "Stops"),
-        renderStopsTable(data.activity, data.stops, model.cumKm),
+        renderStopsTable(data.activity, data.stops, model),
       ),
       el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
     ),
