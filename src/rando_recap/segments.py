@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .stops import Stop
+    from .streams import Streams
 
 
 @dataclass
@@ -81,16 +82,16 @@ def _climb_sum(altitude: list[float] | None, lo: int, hi: int) -> float:
 
 
 def build_segments(
-    streams: dict[str, dict],
+    streams: Streams,
     stops: list[Stop],
 ) -> list[Segment]:
-    """Build ordered segments from streams keyed by type (Strava ``key_by_type=true``)."""
-    time_s: list[int] = streams["time"]["data"]
-    distance: list[float] = streams["distance"]["data"]
-    altitude = streams.get("altitude", {}).get("data")
-    hr = streams.get("heartrate", {}).get("data")
-    cad = streams.get("cadence", {}).get("data")
-    watts = streams.get("watts", {}).get("data")
+    """Build ordered segments from a ride's streams."""
+    time_s = streams.time
+    distance = streams.distance
+    altitude = streams.altitude
+    hr = streams.heartrate
+    cad = streams.cadence
+    watts = streams.watts
 
     n = len(time_s)
     if n == 0:

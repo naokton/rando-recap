@@ -18,6 +18,7 @@ from .daynight import State, Stretch, build_stretches, seconds_by_state
 from .segments import Segment, build_segments, coasting_frac
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
+from .streams import MissingStreamsError, Streams
 
 APP_NAME = "rando-recap"
 
@@ -101,7 +102,7 @@ def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int,
 @dataclass(frozen=True)
 class AnalysisResult:
     activity: dict[str, Any]
-    streams: dict[str, Any]
+    streams: Streams
     stops: list[Stop]
     segments: list[Segment]
     daynight: list[Stretch]
@@ -113,27 +114,22 @@ class ActivityNotCachedError(LookupError):
     """Activity id not present in the local summary cache."""
 
 
-class MissingStreamsError(ValueError):
-    """Activity is missing the ``time`` or ``latlng`` streams (no GPS)."""
-
-
 def _analyze_core(
     activity: dict[str, Any],
-    streams: dict[str, Any],
+    streams: Streams,
     *,
     min_stop_s: int,
     merge_within_m: float,
 ) -> AnalysisResult:
-    if "time" not in streams or "latlng" not in streams:
-        raise MissingStreamsError("Activity is missing 'time' or 'latlng' streams (no GPS?).")
+    streams.require_gps()
     stops = detect_stops(
-        time_s=streams["time"]["data"],
-        latlng=streams["latlng"]["data"],
+        time_s=streams.time,
+        latlng=streams.latlng,
         min_stop_s=min_stop_s,
     )
     stops = merge_nearby_stops(
         stops,
-        distance_m=streams["distance"]["data"],
+        distance_m=streams.distance,
         merge_within_m=merge_within_m,
     )
     segments = build_segments(streams, stops)
@@ -142,8 +138,8 @@ def _analyze_core(
         activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
         utc_offset_s=int(activity.get("utc_offset") or 0),
     )
-    daynight_seconds = seconds_by_state(streams["time"]["data"], daynight)
-    cadence = streams.get("cadence", {}).get("data")
+    daynight_seconds = seconds_by_state(streams.time, daynight)
+    cadence = streams.cadence
     ride_coasting = coasting_frac(cadence, 0, len(cadence) - 1) if cadence else None
     return AnalysisResult(
         activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting
@@ -162,7 +158,7 @@ def analyze_activity(
     activity = sclient.cache.get("summary", activity_id)
     if activity is None:
         raise ActivityNotCachedError(f"Activity {activity_id} not in cache. Run `ride fetch` first.")
-    streams = sclient.get_streams(activity_id, refresh=refresh)
+    streams = Streams(sclient.get_streams(activity_id, refresh=refresh))
     return _analyze_core(activity, streams, min_stop_s=min_stop_s, merge_within_m=merge_within_m)
 
 
@@ -179,7 +175,7 @@ _PASSTHROUGH_STREAM_KEYS = ("latlng", "altitude", "heartrate", "cadence", "watts
 
 def combine_activities(
     parts: list[tuple[dict[str, Any], dict[str, Any]]],
-) -> tuple[dict[str, Any], dict[str, Any]]:
+) -> tuple[dict[str, Any], Streams]:
     """Stitch (activity, streams) pairs into one synthetic pair, sorted by start time.
 
     `time` is offset by each part's start relative to the first part's start;
@@ -246,7 +242,7 @@ def combine_activities(
         "moving_time": sum(int(a.get("moving_time") or 0) for a, _ in parts),
         "total_elevation_gain": sum(float(a.get("total_elevation_gain") or 0) for a, _ in parts),
     }
-    return activity, combined
+    return activity, Streams(combined)
 
 
 def analyze_combined(

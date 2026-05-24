@@ -18,7 +18,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta, timezone
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from .streams import Streams
 
 from astral import Observer
 from astral.sun import sun
@@ -69,13 +72,13 @@ Classifier = Callable[[datetime], State]
 
 
 def build_stretches(
-    streams: dict[str, dict],
+    streams: Streams,
     activity_start_iso: str,
     utc_offset_s: int,
 ) -> list[Stretch]:
     """Bucket the ride's stream into day/twilight/night stretches."""
-    time_s = streams.get("time", {}).get("data") or []
-    latlng = streams.get("latlng", {}).get("data") or []
+    time_s = streams.series("time") or []
+    latlng = streams.series("latlng") or []
     n = min(len(time_s), len(latlng))
     if n == 0:
         return []

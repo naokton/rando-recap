@@ -38,7 +38,7 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
         "daynight": [asdict(s) for s in result.daynight],
     }
     if include_latlng:
-        payload["latlng"] = result.streams["latlng"]["data"]
+        payload["latlng"] = result.streams.latlng
     return payload
 
 

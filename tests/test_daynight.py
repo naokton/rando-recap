@@ -5,10 +5,11 @@ from astral import Observer
 from astral.sun import sun
 
 from rando_recap.daynight import build_stretches
+from rando_recap.streams import Streams
 
 
 def _streams(time_s, latlng):
-    return {"time": {"data": time_s}, "latlng": {"data": latlng}}
+    return Streams({"time": {"data": time_s}, "latlng": {"data": latlng}})
 
 
 def _sf_sun_times_local(d, tzinfo):
@@ -21,7 +22,7 @@ def test_empty_streams_yields_no_stretches():
 
 
 def test_missing_streams_yields_no_stretches():
-    assert build_stretches({}, "2024-08-10T00:00:00Z", -7 * 3600) == []
+    assert build_stretches(Streams({}), "2024-08-10T00:00:00Z", -7 * 3600) == []
 
 
 def test_classification_matches_astral_for_one_day():

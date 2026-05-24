@@ -1,5 +1,6 @@
 from rando_recap.segments import build_segments, coasting_frac
 from rando_recap.stops import Stop
+from rando_recap.streams import Streams
 
 
 def _streams(time_s, distance, **extras):
@@ -9,7 +10,7 @@ def _streams(time_s, distance, **extras):
     }
     for k, v in extras.items():
         out[k] = {"data": v}
-    return out
+    return Streams(out)
 
 
 def test_no_stops_yields_one_segment():
