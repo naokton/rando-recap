@@ -677,7 +677,7 @@ function renderSegmentsTable(segments) {
 }
 
 // --- marker context menu ----------------------------------------------
-// Lightweight native-style context menu shown at the cursor on right-click.
+// Lightweight native-style context menu shown at the cursor on click.
 // Only one menu can be open at a time; closes on outside click, Escape, or
 // scroll/resize (positions go stale).
 let activeMarkerMenu = null;
@@ -723,7 +723,7 @@ function openMarkerMenu(originalEvent, items) {
     if (e.key === "Escape") closeMarkerMenu();
   };
   const onMove = () => closeMarkerMenu();
-  // Defer the outside-click binding so the same right-click that opened the
+  // Defer the outside-click binding so the same click that opened the
   // menu doesn't immediately close it.
   setTimeout(() => document.addEventListener("mousedown", onDocDown, true), 0);
   document.addEventListener("keydown", onKey);
@@ -862,8 +862,7 @@ function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitStops, onClick
       marker.setStyle({ weight: on ? 3 : 1, fillOpacity: on ? 0.5 : 0.2 });
     });
     if (onClickStop) {
-      marker.on("contextmenu", (ev) => {
-        L.DomEvent.preventDefault(ev.originalEvent);
+      marker.on("click", (ev) => {
         if (splitStops.has(i)) return;
         openMarkerMenu(ev.originalEvent, [
           { label: "Split here", onSelect: () => onClickStop(i) },
@@ -975,7 +974,7 @@ function buildMapArea(wrapper, data, model) {
     clearMapPeers();
   };
 
-  // Right-click "Split here" on a stop marker adds a split at that stop,
+  // Clicking "Split here" on a stop marker adds a split at that stop,
   // carving the route into one more pane. Splitting an existing split stop
   // is a no-op. Each split is removed via the ✕ on the pane to its right.
   const onClickStop = (i) => {
