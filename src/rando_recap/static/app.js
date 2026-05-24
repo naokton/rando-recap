@@ -107,7 +107,11 @@ function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") e.className = v;
-    else if (k === "onclick") e.onclick = v;
+    // Any on* key whose value is a function binds that event listener, so
+    // handlers declare inline alongside the element instead of a trailing
+    // addEventListener (onclick, onsubmit, onchange, …).
+    else if (k.startsWith("on") && typeof v === "function")
+      e.addEventListener(k.slice(2).toLowerCase(), v);
     else if (v !== false && v != null) e.setAttribute(k, v);
   }
   for (const c of children.flat()) {
@@ -655,12 +659,19 @@ function openMarkerMenu(originalEvent, items) {
   closeMarkerMenu();
   const menu = el("div", { class: "marker-menu" });
   for (const { label, onSelect } of items) {
-    const item = el("div", { class: "marker-menu-item" }, label);
-    item.addEventListener("click", () => {
-      closeMarkerMenu();
-      onSelect();
-    });
-    menu.appendChild(item);
+    menu.appendChild(
+      el(
+        "div",
+        {
+          class: "marker-menu-item",
+          onclick: () => {
+            closeMarkerMenu();
+            onSelect();
+          },
+        },
+        label,
+      ),
+    );
   }
   document.body.appendChild(menu);
 
