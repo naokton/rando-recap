@@ -62,6 +62,10 @@ def _fmt_unit(v: float | None, unit: str, digits: int = 0) -> str:
     return "-" if v is None else f"{v:.{digits}f} {unit}"
 
 
+def _fmt_pct(frac: float | None) -> str:
+    return "-" if frac is None else f"{frac * 100:.0f}%"
+
+
 def _stop_lines(
     label: str,
     cumulative_km: float,
@@ -230,6 +234,7 @@ def render_terminal(
     activity: dict[str, Any],
     stops: list[Stop],
     segments: list[Segment],
+    coasting_frac: float | None = None,
 ) -> None:
     console = Console()
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
@@ -246,12 +251,13 @@ def render_terminal(
             _PAD,
         )
     )
+    coast = "" if coasting_frac is None else f"   Coast: [bold]{_fmt_pct(coasting_frac)}[/bold]"
     console.print(
         Padding(
             f"Distance: [bold]{dist_km:.1f} km[/bold]   "
             f"Elapsed: [bold]{_fmt_dur(elapsed)}[/bold]   "
             f"Moving: [bold]{_fmt_dur(moving)}[/bold]   "
-            f"Climb: [bold]{climb:.0f} m[/bold]",
+            f"Climb: [bold]{climb:.0f} m[/bold]{coast}",
             _PAD,
         )
     )
@@ -286,6 +292,7 @@ def render_terminal(
     st.add_column("Avg HR", justify="right")
     st.add_column("Avg Cad", justify="right")
     st.add_column("Avg W", justify="right")
+    st.add_column("Coast %", justify="right")
     st.add_column("Climb (m)", justify="right")
     st.add_column("m/km", justify="right")
     for s in segments:
@@ -297,6 +304,7 @@ def render_terminal(
             _fmt_num(s.avg_hr, 0),
             _fmt_num(s.avg_cadence, 0),
             _fmt_num(s.avg_watts, 0),
+            _fmt_pct(s.coasting_frac),
             _fmt_num(s.climb_m, 0),
             _fmt_num(s.climb_m_per_km, 1),
         )
@@ -319,6 +327,7 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
             "moving_day_time_s": daynight_s["day"],
             "moving_twilight_time_s": daynight_s["twilight"],
             "moving_night_time_s": daynight_s["night"],
+            "coasting_frac": result.coasting_frac,
             "total_elevation_gain_m": activity.get("total_elevation_gain"),
         },
         "stops": [{**asdict(c), "rest_s": c.rest_s} for c in result.stops],

@@ -28,6 +28,8 @@ class Segment:
     avg_watts: float | None
     climb_m: float
     climb_m_per_km: float | None
+    coasting_frac: float | None
+    """Fraction of recorded samples with cadence == 0 (freewheeling)."""
 
 
 def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = False) -> float | None:
@@ -44,6 +46,21 @@ def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = Fals
     if not nums:
         return None
     return sum(nums) / len(nums)
+
+
+def coasting_frac(cadence: list | None, lo: int, hi: int) -> float | None:
+    """Fraction of cadence[lo:hi+1] that is zero (freewheeling). None if no data.
+
+    Cadence == 0 is the faithful coasting signal: the cranks aren't turning.
+    Paused time logs no samples (head units auto-pause), so the denominator is
+    already riding time, not elapsed.
+    """
+    if cadence is None:
+        return None
+    present = [v for v in cadence[lo : hi + 1] if v is not None]
+    if not present:
+        return None
+    return sum(1 for v in present if v == 0) / len(present)
 
 
 def _climb_sum(altitude: list[float] | None, lo: int, hi: int) -> float:
@@ -112,6 +129,7 @@ def build_segments(
                 avg_watts=_slice_mean(watts, lo, hi, skip_zero=True),
                 climb_m=climb,
                 climb_m_per_km=climb_per_km,
+                coasting_frac=coasting_frac(cad, lo, hi),
             )
         )
     return segments

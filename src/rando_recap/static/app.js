@@ -87,6 +87,9 @@ function fmtUnit(v, unit, digits = 0) {
 function fmtKmh(mps, digits = 1) {
   return mps == null ? "-" : (mps * 3.6).toFixed(digits);
 }
+function fmtPct(frac) {
+  return frac == null ? "-" : `${Math.round(frac * 100)}%`;
+}
 
 function makeClockFmt(startIso, utcOffsetS) {
   // start_date is UTC ISO; show clock in the activity's local tz (= utc_offset).
@@ -607,6 +610,7 @@ function renderSegmentsTable(segments) {
         el("th", {}, "Avg HR"),
         el("th", {}, "Avg Cad"),
         el("th", {}, "Avg W"),
+        el("th", {}, "Coast %"),
         el("th", {}, "Climb (m)"),
         el("th", {}, "m/km"),
       ),
@@ -625,6 +629,7 @@ function renderSegmentsTable(segments) {
           el("td", {}, fmtNum(s.avg_hr)),
           el("td", {}, fmtNum(s.avg_cadence)),
           el("td", {}, fmtNum(s.avg_watts)),
+          el("td", {}, fmtPct(s.coasting_frac)),
           el("td", {}, fmtNum(s.climb_m)),
           el("td", {}, fmtNum(s.climb_m_per_km, 1)),
         ),
@@ -1218,6 +1223,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
         { class: "summary-col" },
         item("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
         item("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+        item("Coast", fmtPct(a.coasting_frac)),
       ),
       el(
         "div",

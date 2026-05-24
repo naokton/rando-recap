@@ -119,7 +119,7 @@ def analyze(
         sys.stdout.write(render_json(result))
         sys.stdout.write("\n")
     else:
-        render_terminal(result.activity, result.stops, result.segments)
+        render_terminal(result.activity, result.stops, result.segments, result.coasting_frac)
 
 
 @main.command()

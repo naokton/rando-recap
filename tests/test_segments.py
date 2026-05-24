@@ -1,4 +1,4 @@
-from rando_recap.segments import build_segments
+from rando_recap.segments import build_segments, coasting_frac
 from rando_recap.stops import Stop
 
 
@@ -83,6 +83,24 @@ def test_all_zero_cadence_yields_none():
     )
     seg = build_segments(s, stops=[])[0]
     assert seg.avg_cadence is None
+
+
+def test_coasting_frac_counts_cadence_zeros():
+    # 2 of 5 present samples coast; None is ignored in the denominator.
+    cad = [80, 0, 90, None, 0]
+    assert coasting_frac(cad, 0, 4) == 2 / 4
+    assert coasting_frac(None, 0, 4) is None
+    assert coasting_frac([None, None], 0, 1) is None
+
+
+def test_segment_carries_coasting_frac():
+    s = _streams(
+        time_s=[0, 60, 120, 180],
+        distance=[0.0, 1000.0, 2000.0, 3000.0],
+        cadence=[90, 0, 0, 80],
+    )
+    seg = build_segments(s, stops=[])[0]
+    assert seg.coasting_frac == 2 / 4
 
 
 def test_zero_length_segment_skipped():
