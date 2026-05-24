@@ -18,7 +18,6 @@ from .daynight import State, Stretch, build_stretches, seconds_by_state
 from .segments import Segment, build_segments, coasting_frac
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
-from .turnaround import Turnaround, detect_turnaround
 
 APP_NAME = "rando-recap"
 
@@ -108,7 +107,6 @@ class AnalysisResult:
     daynight: list[Stretch]
     daynight_seconds: dict[State, int]
     coasting_frac: float | None
-    turnaround: Turnaround | None
 
 
 class ActivityNotCachedError(LookupError):
@@ -147,9 +145,8 @@ def _analyze_core(
     daynight_seconds = seconds_by_state(streams["time"]["data"], daynight)
     cadence = streams.get("cadence", {}).get("data")
     ride_coasting = coasting_frac(cadence, 0, len(cadence) - 1) if cadence else None
-    turnaround = detect_turnaround(streams["latlng"]["data"], stops)
     return AnalysisResult(
-        activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting, turnaround
+        activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting
     )
 
 

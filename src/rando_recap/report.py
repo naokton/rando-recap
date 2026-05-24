@@ -333,7 +333,6 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
         "stops": [{**asdict(c), "rest_s": c.rest_s} for c in result.stops],
         "segments": [asdict(s) for s in result.segments],
         "daynight": [asdict(s) for s in result.daynight],
-        "turnaround": asdict(result.turnaround) if result.turnaround else None,
     }
     if include_latlng:
         payload["latlng"] = result.streams["latlng"]["data"]
