@@ -40,35 +40,28 @@ class Stretch:
     index_end: int
 
 
-def ride_seconds(time_s: list[int], stretches: list[Stretch]) -> list[int]:
-    """Riding seconds per stretch, excluding recording-gap (pause) time.
-
-    Returns a list parallel to ``stretches``. Adjacent stretches share a
-    boundary index, but each interval is counted by its end index so no time
-    is double-counted across the seam.
-    """
-    n = len(time_s)
-    if n < 2:
-        return [0 for _ in stretches]
-    deltas = sorted(time_s[i] - time_s[i - 1] for i in range(1, n))
+def _gap_threshold(time_s: list[int]) -> int:
+    """Delta above which an inter-sample gap is a recording pause, not riding."""
+    deltas = sorted(time_s[i] - time_s[i - 1] for i in range(1, len(time_s)))
     median = deltas[len(deltas) // 2]
-    gap_threshold = max(_GAP_FLOOR_S, _GAP_CADENCE_FACTOR * median)
-    out: list[int] = []
-    for s in stretches:
-        total = 0
-        for i in range(s.index_start + 1, s.index_end + 1):
-            d = time_s[i] - time_s[i - 1]
-            if d <= gap_threshold:
-                total += d
-        out.append(total)
-    return out
+    return max(_GAP_FLOOR_S, _GAP_CADENCE_FACTOR * median)
 
 
 def seconds_by_state(time_s: list[int], stretches: list[Stretch]) -> dict[State, int]:
-    """Total riding seconds per state, excluding recording-gap (pause) time."""
+    """Riding seconds per state, excluding recording-gap (pause) time.
+
+    Adjacent stretches share a boundary index; each interval is counted by
+    its end index so no time is double-counted across the seam.
+    """
     out: dict[State, int] = {"day": 0, "twilight": 0, "night": 0}
-    for stretch, secs in zip(stretches, ride_seconds(time_s, stretches), strict=True):
-        out[stretch.state] += secs
+    if len(time_s) < 2:
+        return out
+    threshold = _gap_threshold(time_s)
+    for s in stretches:
+        for i in range(s.index_start + 1, s.index_end + 1):
+            d = time_s[i] - time_s[i - 1]
+            if d <= threshold:
+                out[s.state] += d
     return out
 
 
