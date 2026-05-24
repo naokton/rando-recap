@@ -59,10 +59,17 @@ function saveUserParams(partial) {
   } catch {}
 }
 
-const SEGMENT_COLOR = "#048f67";
-const SEGMENT_HOVER_COLOR = "#0ea5e9";
-const STOP_COLOR = "#dc2626";
-const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: "#1c8bc4", night: "#033b73" };
+// Map colors live in style.css (:root) so the palette has one home; Leaflet
+// can't read CSS vars itself, so we resolve them once at load. The stylesheet
+// is <link>ed in <head> before this script runs, so the values are available.
+const cssVar = (() => {
+  const root = getComputedStyle(document.documentElement);
+  return (name) => root.getPropertyValue(name).trim();
+})();
+const SEGMENT_COLOR = cssVar("--segment");
+const SEGMENT_HOVER_COLOR = cssVar("--segment-hover");
+const STOP_COLOR = cssVar("--stop");
+const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: cssVar("--twilight"), night: cssVar("--night") };
 
 const MIN_MAP_HEIGHT_PX = 200;
 const STOP_MARKER_MIN_R = 3;

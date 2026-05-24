@@ -8,6 +8,16 @@
   --bg-soft: #f9fafb;
   --track: #111827;
   --split: #8b88e7;
+  /* Linked hover/selection highlight, shared by tables and the list. */
+  --hl: #d1fae5;
+  /* Map palette. Read in JS via getComputedStyle and handed to Leaflet, which
+     can't consume CSS vars itself — keeping the values here makes CSS the one
+     place colors live. `day` reuses --segment, so JS derives it from there. */
+  --segment: #048f67;
+  --segment-hover: #0ea5e9;
+  --stop: #dc2626;
+  --twilight: #1c8bc4;
+  --night: #033b73;
 }
 * {
   box-sizing: border-box;
@@ -300,7 +310,7 @@ table.rides.merge-mode tbody tr:hover {
 }
 table.rides tr.selected,
 table.rides.merge-mode tbody tr.selected:hover {
-  background: #d1fae5;
+  background: var(--hl);
 }
 
 /* Analysis header */
@@ -620,12 +630,12 @@ body.map-fullscreen-active {
 /* Linked hover highlight across map / timeline / tables */
 .stop-cell.hl,
 .seg-cell.hl {
-  background: #d1fae5;
+  background: var(--hl);
   border-radius: 4px;
 }
 table.data tr.row.hl,
 table.data tr.row.hl:hover {
-  background: #d1fae5;
+  background: var(--hl);
 }
 .leaflet-marker-icon.hl-marker {
   filter: drop-shadow(0 0 4px var(--accent)) brightness(1.05);
