@@ -1322,6 +1322,25 @@ function setHash(params) {
   window.location.hash = new URLSearchParams(params).toString();
 }
 
+// Persist app config (min_stop / merge_within_m) and re-render if the view in
+// front of the user derives from it. These prefs live in localStorage, not the
+// URL, so a change can't ride the hashchange event — the router refreshes
+// explicitly. Only the analysis view consumes them; the list reads none, so
+// it's left untouched (no needless re-fetch, transient merge-mode state kept).
+// Keeping this here means the config dialog doesn't have to know which view is
+// mounted or which fields matter.
+function applyConfig(partial) {
+  const before = parseHash();
+  saveUserParams(partial);
+  const after = parseHash();
+  if (
+    after.view === "analysis" &&
+    (before.minStop !== after.minStop || before.mergeWithinM !== after.mergeWithinM)
+  ) {
+    route();
+  }
+}
+
 function route() {
   unmountCurrentView();
   const r = parseHash();
@@ -1376,20 +1395,9 @@ route();
     const minStop = `${minStopSeconds}s`;
     const mergeWithinM = parseMergeWithin(mergeInput.value);
 
-    // Capture currently-rendered params *before* saving so we can detect
-    // whether the change actually affects this view — these are analysis
-    // params, so a list view just persists them and needs no re-render.
-    const before = parseHash();
-    saveUserParams({ minStop, mergeWithinM });
     dialog.close();
-
-    if (
-      before.view === "analysis" &&
-      (before.minStop !== minStop || before.mergeWithinM !== mergeWithinM)
-    ) {
-      // The hash is unchanged (config lives in saved prefs, not the URL), so
-      // re-render explicitly to re-analyze with the new values.
-      route();
-    }
+    // applyConfig persists the prefs and re-renders only if the current view
+    // depends on them — the dialog stays oblivious to routing.
+    applyConfig({ minStop, mergeWithinM });
   });
 })();
