@@ -217,6 +217,42 @@ main {
   cursor: not-allowed;
 }
 
+.hidden {
+  display: none !important;
+}
+
+/* Timeline / Tables tab switcher */
+.view-tabs {
+  display: flex;
+  gap: 12px;
+  margin: 24px 0 12px;
+  border-bottom: 1px solid var(--border);
+}
+.tab-btn {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: -1px;
+}
+.tab-btn:hover:not(:disabled) {
+  background: var(--bg-soft);
+  color: var(--fg);
+}
+.tab-btn.active {
+  color: var(--fg);
+  border-bottom-color: var(--fg);
+}
+/* Align the top edge of both tab contents; the bar's margin-bottom owns the gap. */
+.tabbed .timeline-wrap {
+  padding-top: 0;
+}
+.tabbed .tables-row h2 {
+  margin-top: 0;
+}
+
 /* List view */
 .list-toolbar {
   display: flex;

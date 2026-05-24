@@ -450,6 +450,33 @@ async function renderList(minDist) {
   renderTable();
 }
 
+// --- section tabs ------------------------------------------------------
+// Tab bar that shows exactly one of its panels at a time. Each tab is
+// { label, panel }; the first is shown initially. Returns a wrapper holding
+// the buttons and all panels (inactive ones carry .hidden).
+function buildSectionTabs(tabs) {
+  const select = (active) => {
+    for (const t of tabs) {
+      const on = t === active;
+      t.panel.classList.toggle("hidden", !on);
+      t.btn.classList.toggle("active", on);
+      t.btn.setAttribute("aria-selected", on ? "true" : "false");
+    }
+  };
+  const bar = el("div", { class: "view-tabs", role: "tablist" });
+  for (const t of tabs) {
+    t.btn = el(
+      "button",
+      { class: "btn tab-btn", type: "button", role: "tab", onclick: () => select(t) },
+      t.label,
+    );
+    bar.appendChild(t.btn);
+  }
+  const wrap = el("div", { class: "tabbed" }, bar, ...tabs.map((t) => t.panel));
+  select(tabs[0]);
+  return wrap;
+}
+
 // --- timeline ----------------------------------------------------------
 function buildTimelineModel(stops, segments) {
   const stopLabels = ["Start", ...stops.map((_, i) => `S${i + 1}`), "End"];
@@ -1275,23 +1302,24 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
   mapArea = buildMapArea(mapDiv, data, model);
 
   // ---------------------
-  // Timeline
-  root.appendChild(renderTimeline(data.activity, data.stops, model));
-
-  // ---------------------
-  // Table
-  root.appendChild(
+  // Timeline / Tables — tabbed so only one shows at a time.
+  const timelinePanel = renderTimeline(data.activity, data.stops, model);
+  const tablesPanel = el(
+    "div",
+    { class: "tables-row" },
     el(
-      "div",
-      { class: "tables-row" },
-      el(
-        "section",
-        {},
-        el("h2", {}, "Stops"),
-        renderStopsTable(data.activity, data.stops, model),
-      ),
-      el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
+      "section",
+      {},
+      el("h2", {}, "Stops"),
+      renderStopsTable(data.activity, data.stops, model),
     ),
+    el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
+  );
+  root.appendChild(
+    buildSectionTabs([
+      { label: "Timeline", panel: timelinePanel },
+      { label: "Tables", panel: tablesPanel },
+    ]),
   );
 }
 
