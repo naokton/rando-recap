@@ -13,7 +13,9 @@ const MIN_STOP_FLOOR_S = 1;
 // Parse a duration string ('5m', '300s', '1h', '90') to seconds, mirroring
 // the backend parse_duration. Returns null on unrecognized input.
 function minStopToSeconds(value) {
-  const m = String(value).trim().match(/^(\d+)\s*([smh]?)$/i);
+  const m = String(value)
+    .trim()
+    .match(/^(\d+)\s*([smh]?)$/i);
   if (!m) return null;
   const unit = (m[2] || "m").toLowerCase();
   return parseInt(m[1], 10) * { s: 1, m: 60, h: 3600 }[unit];
@@ -69,7 +71,11 @@ const cssVar = (() => {
 const SEGMENT_COLOR = cssVar("--segment");
 const SEGMENT_HOVER_COLOR = cssVar("--segment-hover");
 const STOP_COLOR = cssVar("--stop");
-const DAYNIGHT_COLORS = { day: SEGMENT_COLOR, twilight: cssVar("--twilight"), night: cssVar("--night") };
+const DAYNIGHT_COLORS = {
+  day: SEGMENT_COLOR,
+  twilight: cssVar("--twilight"),
+  night: cssVar("--night"),
+};
 
 const MIN_MAP_HEIGHT_PX = 200;
 const STOP_MARKER_MIN_R = 3;
@@ -250,19 +256,26 @@ function buildFilterControl(minDist) {
   const form = el(
     "form",
     { class: "filter-panel" },
-    el("div", { class: "field" }, el("label", {}, "Min distance"), input, el("span", { class: "unit" }, "km")),
-    el("div", { class: "filter-footer" }, el("button", { type: "submit", class: "btn primary" }, "Apply")),
+    el(
+      "div",
+      { class: "field" },
+      el("label", {}, "Min distance"),
+      input,
+      el("span", { class: "unit" }, "km"),
+    ),
+    el(
+      "div",
+      { class: "filter-footer" },
+      el("button", { type: "submit", class: "btn primary" }, "Apply"),
+    ),
   );
-  const btn = el(
-    "button",
-    {
-      class: `btn filter-btn icon${active ? " active" : ""}`,
-      type: "button",
-      title: "Filter",
-      "aria-label": "Filter",
-      onclick: () => toggle(),
-    },
-  );
+  const btn = el("button", {
+    class: `btn filter-btn icon${active ? " active" : ""}`,
+    type: "button",
+    title: "Filter",
+    "aria-label": "Filter",
+    onclick: () => toggle(),
+  });
   const wrap = el("div", { class: "filter-wrap" }, btn, form);
 
   const close = () => {
@@ -814,7 +827,7 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
   }
 }
 
-function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitStops, onClickStop) {
+function drawStopMarkers(map, stops, range, splitStops, onClickStop) {
   // splitStops are the split stops bordering this pane: each anchors the
   // boundary it owns, so it's shown here even though it falls outside the
   // pane's index range.
@@ -845,16 +858,13 @@ function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitStops, onClick
     }))
     .sort((a, b) => b.radius - a.radius);
   const markers = ordered.map(({ c, i, radius }) => {
-    const km = cumKm[i + 1].toFixed(1);
-    const arrive = fmtClock(c.time_before_s);
-    const depart = fmtClock(c.time_after_s);
     const marker = L.circleMarker([c.lat, c.lng], {
       radius,
       color: STOP_COLOR,
       weight: 1,
       fillColor: STOP_COLOR,
       fillOpacity: 0.2,
-    }).bindTooltip(`<b>S${i + 1}</b><br>${km} km<br>${arrive} → ${depart}<br>${fmtDur(c.rest_s)}`, {
+    }).bindTooltip(`<b>S${i + 1}</b><br>${fmtDur(c.rest_s)}`, {
       direction: "top",
       offset: [0, -4],
     });
@@ -864,9 +874,7 @@ function drawStopMarkers(map, stops, cumKm, fmtClock, range, splitStops, onClick
     if (onClickStop) {
       marker.on("click", (ev) => {
         if (splitStops.has(i)) return;
-        openMarkerMenu(ev.originalEvent, [
-          { label: "Split here", onSelect: () => onClickStop(i) },
-        ]);
+        openMarkerMenu(ev.originalEvent, [{ label: "Split here", onSelect: () => onClickStop(i) }]);
       });
     }
     return marker;
@@ -923,15 +931,7 @@ function renderMap(container, data, model, range, ctx) {
   const hasDaynight = drawDaynightPath(map, latlng, daynight, range);
   const segLines = drawSegmentLines(map, latlng, segments, hasDaynight, range);
   drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS);
-  const stopsLayer = drawStopMarkers(
-    map,
-    stops,
-    cumKm,
-    fmtClock,
-    range,
-    ctx.splitStops,
-    ctx.onClickStop,
-  );
+  const stopsLayer = drawStopMarkers(map, stops, range, ctx.splitStops, ctx.onClickStop);
   if (hasDaynight) addMapLegend(map, !!stopsLayer);
 
   const bounds = segLines.length
@@ -1306,12 +1306,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
   const tablesPanel = el(
     "div",
     { class: "tables-row" },
-    el(
-      "section",
-      {},
-      el("h2", {}, "Stops"),
-      renderStopsTable(data.activity, data.stops, model),
-    ),
+    el("section", {}, el("h2", {}, "Stops"), renderStopsTable(data.activity, data.stops, model)),
     el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
   );
   root.appendChild(
@@ -1400,7 +1395,9 @@ route();
 
   document.getElementById("config-btn").addEventListener("click", () => {
     const saved = loadUserParams();
-    const { h, m, s } = secondsToHMS(minStopToSeconds(saved.minStop) ?? minStopToSeconds(DEFAULT_MIN_STOP));
+    const { h, m, s } = secondsToHMS(
+      minStopToSeconds(saved.minStop) ?? minStopToSeconds(DEFAULT_MIN_STOP),
+    );
     minStopH.value = h;
     minStopM.value = m;
     minStopS.value = s;

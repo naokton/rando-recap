@@ -141,9 +141,7 @@ def _analyze_core(
     daynight_seconds = seconds_by_state(streams.time, daynight)
     cadence = streams.cadence
     ride_coasting = coasting_frac(cadence, 0, len(cadence) - 1) if cadence else None
-    return AnalysisResult(
-        activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting
-    )
+    return AnalysisResult(activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting)
 
 
 def analyze_activity(
