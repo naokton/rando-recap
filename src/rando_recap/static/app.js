@@ -256,7 +256,7 @@ function buildFilterControl(minDist) {
   const btn = el(
     "button",
     {
-      class: `btn filter-btn${active ? " active" : ""}`,
+      class: `btn filter-btn icon${active ? " active" : ""}`,
       type: "button",
       title: "Filter",
       "aria-label": "Filter",
@@ -1139,7 +1139,7 @@ function addMapLegend(map, hasStops) {
 function addFullscreenControl(map, container, bounds) {
   let escHandler = null;
   const setOn = addStatefulButton(map, {
-    className: "fullscreen-btn",
+    className: "fullscreen-btn icon",
     // Icons come from CSS (.fullscreen-btn[.is-fullscreen]::before); the label
     // text stays empty and `is-fullscreen` selects maximize vs. minimize.
     labelOn: "",

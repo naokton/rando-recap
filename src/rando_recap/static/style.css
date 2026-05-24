@@ -54,12 +54,10 @@ header a:hover {
 }
 /* Lucide icons (lucide-static @1.16.0, ISC) rendered via CSS mask: the SVG is
    the alpha mask and `background-color: currentColor` paints it, so icons pick
-   up the surrounding text color — including theme vars and :hover. Each button
-   sets its glyph through the --icon custom property on a ::before pseudo; the
-   shared rule below carries the mask plumbing so each only needs --icon + size. */
-.config-btn::before,
-.filter-btn::before,
-.fullscreen-btn::before {
+   up the surrounding text color — including theme vars and :hover. Buttons opt
+   in with the `icon` class for the mask plumbing here, then set their glyph and
+   size on a `<class>::before` rule via the --icon custom property. */
+.icon::before {
   content: "";
   display: block;
   background-color: currentColor;
