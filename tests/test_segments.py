@@ -58,6 +58,33 @@ def test_missing_optional_streams_yield_none_means():
     assert seg.climb_m == 0.0
 
 
+def test_cadence_watts_exclude_zeros_hr_does_not():
+    # Coasting samples log cadence/watts as 0. Those are excluded from the
+    # cadence/watts means (average while active), but HR keeps all samples.
+    s = _streams(
+        time_s=[0, 60, 120, 180],
+        distance=[0.0, 1000.0, 2000.0, 3000.0],
+        heartrate=[140, 0, 150, 160],
+        cadence=[90, 0, 0, 80],
+        watts=[200, 0, 0, 100],
+    )
+    seg = build_segments(s, stops=[])[0]
+    assert seg.avg_hr == (140 + 0 + 150 + 160) / 4  # zeros counted
+    assert seg.avg_cadence == (90 + 80) / 2  # zeros excluded
+    assert seg.avg_watts == (200 + 100) / 2  # zeros excluded
+
+
+def test_all_zero_cadence_yields_none():
+    # A fully-coasting leg has no active samples → no meaningful average.
+    s = _streams(
+        time_s=[0, 60, 120],
+        distance=[0.0, 1000.0, 2000.0],
+        cadence=[0, 0, 0],
+    )
+    seg = build_segments(s, stops=[])[0]
+    assert seg.avg_cadence is None
+
+
 def test_zero_length_segment_skipped():
     # Stop at the very start (e.g. ride begins paused) should not produce a
     # zero-length leading segment.

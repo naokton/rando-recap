@@ -30,11 +30,17 @@ class Segment:
     climb_m_per_km: float | None
 
 
-def _slice_mean(values: list | None, lo: int, hi: int) -> float | None:
-    """Mean of values[lo:hi+1], skipping None/missing. Returns None if empty."""
+def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = False) -> float | None:
+    """Mean of values[lo:hi+1], skipping None/missing. Returns None if empty.
+
+    With ``skip_zero`` (cadence, watts), zero samples are excluded too: a 0
+    means coasting / not pedaling, so counting it answers "average including
+    coasting" — far lower than the "average while active" a rider expects.
+    HR has no zeros, so it keeps the plain mean.
+    """
     if values is None:
         return None
-    nums = [v for v in values[lo : hi + 1] if v is not None]
+    nums = [v for v in values[lo : hi + 1] if v is not None and not (skip_zero and v == 0)]
     if not nums:
         return None
     return sum(nums) / len(nums)
@@ -102,8 +108,8 @@ def build_segments(
                 duration_s=dur_s,
                 avg_speed_mps=avg_speed,
                 avg_hr=_slice_mean(hr, lo, hi),
-                avg_cadence=_slice_mean(cad, lo, hi),
-                avg_watts=_slice_mean(watts, lo, hi),
+                avg_cadence=_slice_mean(cad, lo, hi, skip_zero=True),
+                avg_watts=_slice_mean(watts, lo, hi, skip_zero=True),
                 climb_m=climb,
                 climb_m_per_km=climb_per_km,
             )
