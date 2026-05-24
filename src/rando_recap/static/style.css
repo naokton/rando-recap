@@ -519,6 +519,16 @@ table.data tr.row:hover {
 table.data tr.row.split-stop td {
   color: var(--split);
 }
+/* Split toggle column: center the checkbox and tint it to match split styling. */
+table.data th.split-cell,
+table.data td.split-cell {
+  text-align: center;
+}
+input.split-toggle {
+  cursor: pointer;
+  accent-color: var(--split);
+  margin: 0;
+}
 /* Heavier divider at a split: the bottom edge of the segment row arriving at
    the split stop, i.e. the line between that stop's incoming and outgoing rows. */
 table.data.segments tr.row.split-border td {

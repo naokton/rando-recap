@@ -592,14 +592,14 @@ function renderTimeline(activity, stops, model) {
 }
 
 // --- tables ------------------------------------------------------------
-function renderStopsTable(activity, stops, model) {
+function renderStopsTable(activity, stops, model, onToggleSplit) {
   const { cumKm, endS } = model;
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
   // Bookend the stops with Start/End rows so the table lines up row-for-row
   // with the Segments table beside it (Start, Start→S1, S1, S1→S2, …). They
   // carry the same data-stop keys as the timeline/map peers ("start"/"end"),
   // so linked hover highlighting works without extra wiring.
-  const row = (key, label, km, arrive, depart, rest) =>
+  const row = (key, label, km, arrive, depart, rest, splitCell) =>
     el(
       "tr",
       { class: "row", "data-stop": key },
@@ -608,7 +608,20 @@ function renderStopsTable(activity, stops, model) {
       el("td", {}, arrive),
       el("td", {}, depart),
       el("td", {}, rest),
+      el("td", { class: "split-cell" }, splitCell),
     );
+  // Only the interior stops are splittable; the Start/End bookends get an empty
+  // cell. The checkbox's checked state is owned by buildMapArea.syncSplitStops
+  // (single source of truth = the splits set), so onToggleSplit just reports the
+  // click and the re-render flips it back if needed.
+  const splitToggle = (i) =>
+    el("input", {
+      type: "checkbox",
+      class: "split-toggle",
+      title: "Split route here",
+      "aria-label": `Split route at S${i + 1}`,
+      onchange: () => onToggleSplit(i),
+    });
   return el(
     "table",
     { class: "data" },
@@ -623,12 +636,13 @@ function renderStopsTable(activity, stops, model) {
         el("th", {}, "Arrive"),
         el("th", {}, "Depart"),
         el("th", {}, "Rest"),
+        el("th", { class: "split-cell" }, "Split"),
       ),
     ),
     el(
       "tbody",
       {},
-      row("start", "Start", cumKm[0].toFixed(1), "-", fmtClock(0), "-"),
+      row("start", "Start", cumKm[0].toFixed(1), "-", fmtClock(0), "-", null),
       stops.map((c, i) =>
         row(
           `c${i}`,
@@ -637,9 +651,10 @@ function renderStopsTable(activity, stops, model) {
           fmtClock(c.time_before_s),
           fmtClock(c.time_after_s),
           fmtDur(c.rest_s),
+          splitToggle(i),
         ),
       ),
-      row("end", "End", cumKm[cumKm.length - 1].toFixed(1), fmtClock(endS), "-", "-"),
+      row("end", "End", cumKm[cumKm.length - 1].toFixed(1), fmtClock(endS), "-", "-", null),
     ),
   );
 }
@@ -988,6 +1003,15 @@ function buildMapArea(wrapper, data, model) {
     render();
   };
 
+  // Toggle a split from the Stops table: add it if absent, drop it if already
+  // a split point. Same effect as "Split here" / the pane ✕, just driven by
+  // the table's per-row checkbox.
+  const toggleSplit = (i) => {
+    if (splits.includes(i)) splits = splits.filter((x) => x !== i);
+    else splits = [...splits, i].sort((a, b) => a - b);
+    render();
+  };
+
   // Mark the current split stops in the timeline and Stops table (which carry
   // matching data-stop keys) so they read as distinct from ordinary stops, and
   // thicken the Segments-table divider at each split: the segment row arriving
@@ -996,8 +1020,13 @@ function buildMapArea(wrapper, data, model) {
   const syncSplitStops = () => {
     root.querySelectorAll(".split-stop").forEach((e) => e.classList.remove("split-stop"));
     root.querySelectorAll(".split-border").forEach((e) => e.classList.remove("split-border"));
+    // The Stops-table checkboxes mirror the splits set; clear then re-check so
+    // they stay in sync however a split was added (table, map menu, or ✕).
+    root.querySelectorAll("input.split-toggle").forEach((cb) => (cb.checked = false));
     for (const i of splits) {
       root.querySelectorAll(`[data-stop="c${i}"]`).forEach((e) => e.classList.add("split-stop"));
+      const cb = root.querySelector(`tr[data-stop="c${i}"] input.split-toggle`);
+      if (cb) cb.checked = true;
     }
     const suffixes = splits.map((i) => `→ S${i + 1}`);
     root.querySelectorAll("table.segments tr.row[data-seg]").forEach((tr) => {
@@ -1047,7 +1076,7 @@ function buildMapArea(wrapper, data, model) {
   };
 
   render();
-  return { destroy: teardown };
+  return { destroy: teardown, toggleSplit };
 }
 
 // --- map controls ------------------------------------------------------
@@ -1306,7 +1335,12 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
   const tablesPanel = el(
     "div",
     { class: "tables-row" },
-    el("section", {}, el("h2", {}, "Stops"), renderStopsTable(data.activity, data.stops, model)),
+    el(
+      "section",
+      {},
+      el("h2", {}, "Stops"),
+      renderStopsTable(data.activity, data.stops, model, (i) => mapArea && mapArea.toggleSplit(i)),
+    ),
     el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
   );
   root.appendChild(
