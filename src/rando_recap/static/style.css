@@ -309,7 +309,6 @@ main {
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/filter.svg");
 }
 .filter-btn.active {
-  border-color: var(--accent);
   color: var(--accent);
 }
 .filter-panel {
