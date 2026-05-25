@@ -642,33 +642,35 @@ table.data.segments tr.row.split-border td {
   border-bottom-color: var(--split);
 }
 
-/* Map */
+/* Map. #map and the split summary row are both flex rows of equal-width
+   columns; summaries sit below the resize handle so it resizes maps only. */
+#map,
+.pane-summaries.split {
+  display: flex;
+  gap: 4px;
+}
 #map {
   height: 480px;
   min-height: 200px;
-  display: flex;
-  gap: 4px;
   border-radius: 4px 4px 0 0;
   overflow: hidden;
 }
+.pane-summaries {
+  display: none;
+}
+.pane-summaries.split {
+  margin-top: 4px;
+}
 #map .leaflet-map {
-  flex: 1;
-  min-width: 0;
   height: 100%;
   border: 1px solid var(--border);
 }
-/* Split mode: each pane is a column of [map, per-pane summary]. The map flexes
-   to fill whatever height the summary leaves within the resizable #map box. */
-#map .map-pane {
+/* Equal-width columns; min-width:0 lets each shrink to its share so a summary
+   stays aligned under its map. */
+#map .leaflet-map,
+.pane-summary {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-#map .map-pane .leaflet-map {
-  height: auto;
-  min-height: 0;
 }
 .pane-summary {
   display: flex;
@@ -693,8 +695,9 @@ table.data.segments tr.row.split-border td {
 }
 .pane-summary .pane-dn {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 4px 12px;
   color: var(--muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -703,6 +706,7 @@ table.data.segments tr.row.split-border td {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 .pane-summary .pane-dn .dn-dot {
   width: 8px;

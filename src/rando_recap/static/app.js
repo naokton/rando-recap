@@ -1217,7 +1217,7 @@ function paneSummary(segs, elapsedS) {
   );
 }
 
-function buildMapArea(wrapper, data, model) {
+function buildMapArea(mapWrap, summaryWrap, data, model) {
   let splits = []; // sorted ascending stop indices; [] = single-map mode
   let maps = [];
 
@@ -1275,7 +1275,8 @@ function buildMapArea(wrapper, data, model) {
 
   const render = () => {
     teardown();
-    wrapper.innerHTML = "";
+    mapWrap.innerHTML = "";
+    summaryWrap.innerHTML = "";
     const last = data.latlng.length - 1;
     const boundaries = splits.map((i) => splitInfoForStop(data.stops, i));
     // N splits → N+1 panes. Pane k runs from the previous split's afterIdx (or
@@ -1311,17 +1312,16 @@ function buildMapArea(wrapper, data, model) {
       });
     }
     const isSplit = splits.length > 0;
-    wrapper.classList.toggle("split", isSplit);
+    summaryWrap.classList.toggle("split", isSplit);
     syncSplitStops();
-    // Single-map mode keeps the whole-ride summary up top; only split panes
-    // carry their own summary, wrapped with the map in a .map-pane column.
+    // Single-map mode keeps the whole-ride summary up top; only split panes get
+    // their own summary. Maps live in #map (the only thing the drag handle
+    // resizes); the per-pane summaries live in a matching column row below the
+    // handle.
     const inners = panes.map((p) => {
       const d = el("div", { class: "leaflet-map" });
-      if (isSplit) {
-        wrapper.appendChild(el("div", { class: "map-pane" }, d, paneSummary(p.segs, p.elapsed)));
-      } else {
-        wrapper.appendChild(d);
-      }
+      mapWrap.appendChild(d);
+      if (isSplit) summaryWrap.appendChild(paneSummary(p.segs, p.elapsed));
       return d;
     });
     // Leaflet needs the container in the DOM with size before init.
@@ -1613,14 +1613,13 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
   // ---------------------
   // Map
   const mapDiv = el("div", { id: "map" });
-  const resizeHandle = el("div", {
-    class: "map-resize-handle",
-    title: "Drag to resize map",
-  });
+  const resizeHandle = el("div", { class: "map-resize-handle", title: "Drag to resize map" });
+  const summariesDiv = el("div", { class: "pane-summaries" });
   root.appendChild(mapDiv);
   root.appendChild(resizeHandle);
+  root.appendChild(summariesDiv);
   attachMapResizer(mapDiv, resizeHandle);
-  mapArea = buildMapArea(mapDiv, data, model);
+  mapArea = buildMapArea(mapDiv, summariesDiv, data, model);
 
   // ---------------------
   // Timeline / Tables — tabbed so only one shows at a time.
