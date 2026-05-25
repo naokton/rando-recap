@@ -1436,8 +1436,66 @@ function route() {
   else renderList(r.minDist);
 }
 
-window.addEventListener("hashchange", route);
-route();
+// --- sign-in gate ------------------------------------------------------
+// The whole app needs a Strava token. Check auth once at startup: render
+// the sign-in screen when there's no token, otherwise wire up routing.
+// The OAuth callback redirects back to "/", so a fresh load re-runs boot()
+// and lands on the normal view once authenticated.
+function renderSignIn(configured) {
+  unmountCurrentView();
+  root.innerHTML = "";
+  const body = configured
+    ? el(
+        "div",
+        { class: "signin" },
+        el("p", {}, "Connect your Strava account to analyze your rides."),
+        el(
+          "a",
+          { class: "strava-connect", href: "/auth/strava", "aria-label": "Connect with Strava" },
+          el("img", {
+            src: "/static/vendor/strava/btn_strava_connect_with_orange.svg",
+            alt: "Connect with Strava",
+            height: "48",
+          }),
+        ),
+      )
+    : el(
+        "div",
+        { class: "signin" },
+        el("p", { class: "error" }, "Strava credentials are not configured."),
+        el(
+          "p",
+          {},
+          "Set ",
+          el("code", {}, "STRAVA_CLIENT_ID"),
+          " and ",
+          el("code", {}, "STRAVA_CLIENT_SECRET"),
+          " in ",
+          el("code", {}, ".env"),
+          ", then restart the server.",
+        ),
+      );
+  root.appendChild(el("div", { class: "signin-wrap" }, body));
+}
+
+async function boot() {
+  let status;
+  try {
+    status = await fetchJson("/api/auth/status");
+  } catch {
+    // If the status probe itself fails, fall through to normal routing so
+    // the per-view error handling can surface what went wrong.
+    status = { configured: true, authenticated: true };
+  }
+  if (!status.authenticated) {
+    renderSignIn(status.configured);
+    return;
+  }
+  window.addEventListener("hashchange", route);
+  route();
+}
+
+boot();
 
 // --- config dialog ------------------------------------------------------
 (function setupConfigDialog() {

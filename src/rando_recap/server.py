@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from .app import (
@@ -21,7 +22,7 @@ from .app import (
     parse_duration,
 )
 from .payload import build_payload
-from .strava import StravaScopeError
+from .strava import StravaClient, StravaScopeError
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -32,6 +33,56 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+# The pending OAuth CSRF token, minted by /auth/strava and verified by the
+# callback. A single value suffices for single-user local T3: only one login is
+# ever in flight, and minting a new one supersedes any abandoned handshake. A
+# server restart mid-login just means clicking "Sign in" again; persisted
+# tokens (token.json) keep already-authenticated users signed in across restarts.
+_pending_state: str | None = None
+
+
+def _require_client() -> StravaClient:
+    try:
+        return client()
+    except ConfigError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+
+@app.get("/api/auth/status")
+def auth_status() -> dict[str, bool]:
+    """Report whether Strava credentials are configured and a token is held."""
+    try:
+        c = client()
+    except ConfigError:
+        return {"configured": False, "authenticated": False}
+    return {"configured": True, "authenticated": c.authenticated}
+
+
+@app.get("/auth/strava", include_in_schema=False)
+def auth_strava(request: Request) -> RedirectResponse:
+    """Begin the OAuth flow: mint a state token and redirect to Strava."""
+    global _pending_state
+    c = _require_client()
+    _pending_state = secrets.token_urlsafe(16)
+    redirect_uri = str(request.url_for("auth_callback"))
+    return RedirectResponse(c.authorize_url(redirect_uri, _pending_state), status_code=302)
+
+
+@app.get("/auth/callback", include_in_schema=False)
+def auth_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+) -> RedirectResponse:
+    """Strava redirects here: validate state, exchange the code, save the token."""
+    global _pending_state
+    if _pending_state is None or state != _pending_state:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state.")
+    _pending_state = None
+    c = _require_client()
+    c.exchange_code(code)
+    return RedirectResponse("/", status_code=302)
 
 
 @app.get("/api/rides")
@@ -88,7 +139,7 @@ def analyze_ride(
     except ConfigError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     if not c.authenticated:
-        raise HTTPException(status_code=401, detail="Not authenticated. Run `ride login` first.")
+        raise HTTPException(status_code=401, detail="Not authenticated. Sign in with Strava first.")
 
     parsed = _parse_activity_id(activity_id)
     try:

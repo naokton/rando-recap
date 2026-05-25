@@ -698,6 +698,37 @@ body.map-fullscreen-active {
   color: #b91c1c;
 }
 
+/* Sign-in gate (shown when no Strava token is held) */
+.signin-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 64px 16px;
+}
+.signin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 28rem;
+  text-align: center;
+}
+.signin p {
+  margin: 0;
+  color: var(--muted);
+}
+/* Official Strava "Connect with Strava" button (see vendor/strava/NOTICE).
+   The asset is a complete button; don't restyle it beyond hover feedback. */
+a.strava-connect {
+  display: inline-block;
+  line-height: 0;
+}
+a.strava-connect img {
+  display: block;
+}
+a.strava-connect:hover {
+  opacity: 0.9;
+}
+
 /* Linked hover highlight across map / timeline / tables */
 .stop-cell.hl,
 .seg-cell.hl {

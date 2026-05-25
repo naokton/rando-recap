@@ -1,21 +1,21 @@
-"""Strava API client: OAuth (one-time browser flow), activity + streams fetch.
+"""Strava API client: OAuth (web flow), activity + streams fetch.
 
-Tokens are cached to disk and auto-refreshed when expired.
-Activity and stream responses go through ``cache.Cache``.
+The web server brokers the OAuth handshake (see ``server.py``): it builds the
+authorize URL via :meth:`StravaClient.authorize_url` and exchanges the returned
+code via :meth:`StravaClient.exchange_code`. Tokens are cached to disk and
+auto-refreshed when expired. Activity and stream responses go through
+``cache.Cache``.
 """
 
 from __future__ import annotations
 
 import json
-import secrets
 import sys
 import time
-import webbrowser
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import urlencode
 
 import httpx
 
@@ -77,10 +77,12 @@ class StravaClient:
 
     # --- auth ----------------------------------------------------------------
 
-    def login(self, port: int = 8721) -> None:
-        """Run the one-time browser OAuth flow and persist tokens."""
-        state = secrets.token_urlsafe(16)
-        redirect_uri = f"http://localhost:{port}/callback"
+    def authorize_url(self, redirect_uri: str, state: str) -> str:
+        """Build the Strava authorize URL the browser is redirected to.
+
+        ``redirect_uri`` must point back at this server's callback route and
+        ``state`` is an opaque CSRF token the caller verifies on callback.
+        """
         params = {
             "client_id": self.client_id,
             "redirect_uri": redirect_uri,
@@ -89,32 +91,11 @@ class StravaClient:
             "approval_prompt": "auto",
             "state": state,
         }
-        url = f"{AUTHORIZE_URL}?{urlencode(params)}"
-        code_holder: dict[str, str] = {}
+        return f"{AUTHORIZE_URL}?{urlencode(params)}"
 
-        class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
-                qs = parse_qs(urlparse(self.path).query)
-                if qs.get("state", [""])[0] != state:
-                    self.send_response(400)
-                    self.end_headers()
-                    return
-                code_holder["code"] = qs.get("code", [""])[0]
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html")
-                self.end_headers()
-                self.wfile.write(b"<h1>Authorized.</h1><p>You can close this tab.</p>")
-
-            def log_message(self, format: str, *args: object) -> None:
-                return
-
-        server = HTTPServer(("localhost", port), Handler)
-        webbrowser.open(url)
-        # Single request: handle the callback then return.
-        server.handle_request()
-        if "code" not in code_holder:
-            raise RuntimeError("Strava OAuth callback did not return a code")
-        self._exchange_code(code_holder["code"])
+    def exchange_code(self, code: str) -> None:
+        """Exchange an authorization code for tokens and persist them."""
+        self._post_token({"grant_type": "authorization_code", "code": code})
 
     def _post_token(self, grant: dict[str, str]) -> None:
         resp = httpx.post(
@@ -135,16 +116,13 @@ class StravaClient:
         )
         self._token.save(self.token_path)
 
-    def _exchange_code(self, code: str) -> None:
-        self._post_token({"grant_type": "authorization_code", "code": code})
-
     def _refresh(self) -> None:
         assert self._token is not None
         self._post_token({"grant_type": "refresh_token", "refresh_token": self._token.refresh_token})
 
     def _auth_headers(self) -> dict[str, str]:
         if self._token is None:
-            raise RuntimeError("Not authenticated. Run `ride login` first.")
+            raise RuntimeError("Not authenticated. Sign in with Strava first.")
         if self._token.expired():
             self._refresh()
         return {"Authorization": f"Bearer {self._token.access_token}"}
@@ -160,7 +138,7 @@ class StravaClient:
             raise StravaScopeError(
                 f"Strava returned 404 for {what}. The activity is either "
                 "private (and your token lacks the activity:read_all scope) "
-                "or the id is wrong. Run `ride login` to (re-)do the browser "
+                "or the id is wrong. Sign in with Strava again to re-do the "
                 "OAuth flow with the right scope."
             )
         resp.raise_for_status()

@@ -17,21 +17,24 @@ CLI.
    Set "Authorization Callback Domain" to `localhost`.
 2. Copy `.env.example` to `.env` and fill in `STRAVA_CLIENT_ID` and
    `STRAVA_CLIENT_SECRET`.
-3. Install deps and authenticate:
+3. Install deps and start the server:
 
    ```bash
    uv sync
-   uv run app login
+   uv run app serve
    ```
 
-   A browser tab opens; approve access. The token is stored under your OS
-   config dir (`~/Library/Application Support/rando-recap/token.json` on
-   macOS) and refreshed automatically.
+   Open <http://localhost:8000> and click **Sign in with Strava**; approve
+   access. Use the `localhost` host (not `127.0.0.1`) so the OAuth callback
+   matches the "Authorization Callback Domain" you registered above. The token
+   is stored under your OS config dir
+   (`~/Library/Application Support/rando-recap/token.json` on macOS) and
+   refreshed automatically — sign-in is a one-time step that survives restarts.
 
 ## Web app
 
 ```bash
-uv run app serve                       # http://127.0.0.1:8000
+uv run app serve                       # http://localhost:8000
 uv run app serve --host 0.0.0.0 --port 8080
 uv run app serve --reload              # dev: auto-reload on code change
 ```

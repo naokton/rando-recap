@@ -1,4 +1,8 @@
-"""CLI entry point: ``ride analyze <activity_id>`` and ``ride login``."""
+"""CLI entry point: ``ride analyze <activity_id>``, ``ride fetch``, ``ride serve``.
+
+Authentication is web-based: run ``ride serve`` and click "Sign in with Strava".
+The browser flow writes the same token file the CLI commands read.
+"""
 
 from __future__ import annotations
 
@@ -59,14 +63,6 @@ def main() -> None:
 
 
 @main.command()
-def login() -> None:
-    """One-time Strava OAuth flow. Opens a browser tab."""
-    sclient = _client()
-    sclient.login()
-    click.echo("Logged in. Token saved.")
-
-
-@main.command()
 @click.argument("activity_id", type=int)
 @click.option(
     "--min-stop",
@@ -99,7 +95,7 @@ def analyze(
     """Analyze one cached activity and print per-stop / per-segment stats."""
     sclient = _client()
     if not sclient.authenticated:
-        raise click.ClickException("Not authenticated. Run `ride login` first.")
+        raise click.ClickException("Not authenticated. Run `ride serve` and sign in with Strava first.")
     try:
         min_stop_s = parse_duration(min_stop)
     except ValueError as e:
@@ -135,7 +131,7 @@ def fetch(since: str, refresh: bool) -> None:
     """Cache every activity summary in --since window. Filtering happens at list time."""
     sclient = _client()
     if not sclient.authenticated:
-        raise click.ClickException("Not authenticated. Run `ride login` first.")
+        raise click.ClickException("Not authenticated. Run `ride serve` and sign in with Strava first.")
 
     after = _parse_since(since)
     seen = added = skipped_cached = 0
