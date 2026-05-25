@@ -1284,8 +1284,8 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     sourceIds.forEach((id, i) => {
       if (i) links.push(" · ");
       // Strava Brand Guidelines §3: the link text must read "View on Strava".
-      // For merged rides the ordinal prefix is plain text, outside the link.
-      if (multi) links.push(`(${i + 1}) `);
+      // For merged rides the ordinal stays inside the anchor so each link
+      // still leads with the required phrase.
       links.push(
         el(
           "a",
@@ -1295,18 +1295,11 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
             target: "_blank",
             rel: "noopener external",
           },
-          "View on Strava",
+          multi ? `View on Strava (${i + 1})` : "View on Strava",
         ),
       );
     });
-    root.appendChild(
-      el(
-        "div",
-        { class: "source-links" },
-        el("span", { class: "label" }, multi ? "Source activities:" : "Source:"),
-        ...links,
-      ),
-    );
+    root.appendChild(el("div", { class: "source-links" }, ...links));
   }
 
   const item = (label, value) =>

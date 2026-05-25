@@ -110,9 +110,6 @@ main {
   font-size: 13px;
   color: var(--muted);
 }
-.source-links .label {
-  margin-right: 6px;
-}
 /* Strava Brand Guidelines §3: data links must be identifiable as links via
    bold, underline, or orange #FC5200. Persistent underline satisfies this. */
 .source-links a.strava-link {
