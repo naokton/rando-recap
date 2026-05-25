@@ -468,14 +468,15 @@ table.rides.merge-mode tbody tr.selected:hover {
 
 .summary {
   display: flex;
-  justify-content: start;
-  gap: 32px;
+  flex-direction: column;
+  gap: 8px;
   margin: 8px 0 16px;
 }
-.summary-col {
+.summary-row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-direction: row;
+  align-items: start;
+  gap: 32px;
 }
 .summary .item {
   display: flex;
