@@ -43,10 +43,13 @@ Routes:
 
 - `/` — ride list (filtered by minimum distance). Click a ride for the
   analysis view: map, timeline, stops table, segments table. The **Fetch
-  rides** button pulls activity summaries from Strava (see below).
+  rides** button pulls activity summaries from Strava (see below). The **Merge
+  rides** button selects two or more rides and opens them as one combined
+  analysis (see below).
 - `/api/rides` — JSON list of cached rides. Query: `min_distance_km`, `types`.
-- `/api/rides/{activity_id}/analysis` — JSON analysis. Query: `min_stop`,
-  `refresh`.
+- `/api/rides/{activity_id}/analysis` — JSON analysis. `activity_id` is an
+  integer, or `combined:<id>,<id>,…` to stitch several uploads into one ride.
+  Query: `min_stop`, `merge_within_m`, `refresh`.
 - `POST /api/fetch` — cache activity summaries, streaming progress as
   Server-Sent Events. Query: `since`.
 
@@ -57,8 +60,11 @@ highlights the others. The ⟳ button by the title re-fetches that ride's
 streams from Strava (one API call) — use it if you trimmed or fixed the GPS
 track after it was cached.
 
-UI state lives in the URL hash: `#min_dist=190` on the list, and
-`#ride=<id>&min_stop=5m` on the analysis page — refresh-safe and shareable.
+Multi-day brevets often upload to Strava as separate per-day activities. Click
+**Merge rides**, select two or more, and **Open** to analyze them as one
+synthetic ride. The parts are stitched in start-time order; the gaps between
+them (overnight sleep, etc.) survive as real gaps in the time stream, so they
+show up as stops just like any other.
 
 The server is single-user with no auth; bind to `127.0.0.1` unless you know
 what you're doing. On first run the list is empty — click **Fetch rides** to
@@ -87,9 +93,10 @@ time, so you can change the threshold without re-fetching.
 
 ```bash
 uv run app analyze <activity_id>
-uv run app analyze <activity_id> --min-stop 10m   # raise stop threshold
-uv run app analyze <activity_id> --json           # structured output
-uv run app analyze <activity_id> --refresh        # bypass local cache
+uv run app analyze <activity_id> --min-stop 10m       # raise stop threshold
+uv run app analyze <activity_id> --merge-within 200   # merge near stops (m); 0 disables
+uv run app analyze <activity_id> --json               # structured output
+uv run app analyze <activity_id> --refresh            # bypass local cache
 ```
 
 `<activity_id>` is the integer at the end of a Strava activity URL.
@@ -98,8 +105,8 @@ The terminal report shows:
 
 - **Stops** — clock time arriving / departing / dwell, with lat,lng.
 - **Segments** — distance, time, avg km/h, avg HR, avg cadence, avg power,
-  climb (m), climb m/km. Within a segment elapsed time = moving time, since
-  paused intervals only appear at stops.
+  coasting %, climb (m), climb m/km. Within a segment elapsed time = moving
+  time, since paused intervals only appear at stops.
 
 ### List cached rides
 
