@@ -43,29 +43,43 @@ class Stretch:
     index_end: int
 
 
-def _gap_threshold(time_s: list[int]) -> int:
+def gap_threshold(time_s: list[int]) -> int:
     """Delta above which an inter-sample gap is a recording pause, not riding."""
     deltas = sorted(time_s[i] - time_s[i - 1] for i in range(1, len(time_s)))
     median = deltas[len(deltas) // 2]
     return max(_GAP_FLOOR_S, _GAP_CADENCE_FACTOR * median)
 
 
-def seconds_by_state(time_s: list[int], stretches: list[Stretch]) -> dict[State, int]:
-    """Riding seconds per state, excluding recording-gap (pause) time.
+def seconds_by_state_range(
+    time_s: list[int],
+    stretches: list[Stretch],
+    lo: int,
+    hi: int,
+    threshold: int,
+) -> dict[State, int]:
+    """Riding seconds per state within sample indices ``[lo, hi]``, gap-excluded.
 
     Adjacent stretches share a boundary index; each interval is counted by
-    its end index so no time is double-counted across the seam.
+    its end index so no time is double-counted across the seam. Stretches are
+    clipped to ``[lo, hi]`` so a segment of the ride can be measured in
+    isolation with the same logic as the whole.
     """
     out: dict[State, int] = {"day": 0, "twilight": 0, "night": 0}
-    if len(time_s) < 2:
-        return out
-    threshold = _gap_threshold(time_s)
     for s in stretches:
-        for i in range(s.index_start + 1, s.index_end + 1):
+        start = max(s.index_start, lo)
+        end = min(s.index_end, hi)
+        for i in range(start + 1, end + 1):
             d = time_s[i] - time_s[i - 1]
             if d <= threshold:
                 out[s.state] += d
     return out
+
+
+def seconds_by_state(time_s: list[int], stretches: list[Stretch]) -> dict[State, int]:
+    """Riding seconds per state over the whole ride, excluding recording gaps."""
+    if len(time_s) < 2:
+        return {"day": 0, "twilight": 0, "night": 0}
+    return seconds_by_state_range(time_s, stretches, 0, len(time_s) - 1, gap_threshold(time_s))
 
 
 Classifier = Callable[[datetime], State]

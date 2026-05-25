@@ -199,12 +199,12 @@ def _analyze_core(
         distance_m=streams.distance,
         merge_within_m=merge_within_m,
     )
-    segments = build_segments(streams, stops)
     daynight = build_stretches(
         streams,
         activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
         utc_offset_s=int(activity.get("utc_offset") or 0),
     )
+    segments = build_segments(streams, stops, daynight)
     daynight_seconds = seconds_by_state(streams.time, daynight)
     cadence = streams.cadence
     ride_coasting = coasting_frac(cadence, 0, len(cadence) - 1) if cadence else None

@@ -1167,6 +1167,56 @@ function renderMap(container, data, model, range, ctx) {
   return map;
 }
 
+// Shared summary builders, used by both the whole-ride summary and the
+// per-pane summaries shown under each split map.
+function summaryItem(label, value) {
+  return el(
+    "div",
+    { class: "item" },
+    el("span", { class: "label" }, `${label}:`),
+    el("span", { class: "value" }, value),
+  );
+}
+
+function summaryDnRow(state, value) {
+  return el(
+    "div",
+    { class: "dn-row" },
+    el("span", { class: "dn-dot", style: `background:${DAYNIGHT_COLORS[state]}` }),
+    el("span", { class: "dn-label" }, state),
+    el("span", { class: "dn-value" }, value),
+  );
+}
+
+// Per-split summary: the whole-ride distance/elapsed/etc are Strava aggregates
+// that can't be subdivided, so each pane's figures are pooled from its segments
+// (stream-derived) instead — Moving and the day/night breakdown come straight
+// from the per-segment fields, Rest is Elapsed − Moving. Elapsed is the wall
+// clock between the pane's bordering split stops (passed in by the caller).
+function paneSummary(segs, elapsedS) {
+  const sum = (f) => segs.reduce((acc, s) => acc + (f(s) || 0), 0);
+  const movingS = sum((s) => s.moving_s);
+  const coastD = sum((s) => s.coasting_d);
+  const coastFrac = coastD ? sum((s) => s.coasting_n) / coastD : null;
+  return el(
+    "div",
+    { class: "pane-summary" },
+    summaryItem("Dist", `${(sum((s) => s.distance_m) / 1000).toFixed(1)} km`),
+    summaryItem("Climb", `${Math.round(sum((s) => s.climb_m))} m`),
+    summaryItem("Moving", fmtDur(movingS)),
+    summaryItem("Elapsed", fmtDur(elapsedS)),
+    summaryItem("Rest", fmtDur(Math.max(0, elapsedS - movingS))),
+    summaryItem("Coast", fmtPct(coastFrac)),
+    el(
+      "div",
+      { class: "pane-dn" },
+      summaryDnRow("day", fmtDur(sum((s) => s.day_s))),
+      summaryDnRow("twilight", fmtDur(sum((s) => s.twilight_s))),
+      summaryDnRow("night", fmtDur(sum((s) => s.night_s))),
+    ),
+  );
+}
+
 function buildMapArea(wrapper, data, model) {
   let splits = []; // sorted ascending stop indices; [] = single-map mode
   let maps = [];
@@ -1232,10 +1282,20 @@ function buildMapArea(wrapper, data, model) {
     // the track start) to the next split's beforeIdx (or the track end). Each
     // split stop is shown on the two panes it borders, and every pane but the
     // first carries a ✕ that removes the split on its left edge.
+    const nStops = data.stops.length;
     const panes = [];
     for (let k = 0; k <= boundaries.length; k++) {
       const left = boundaries[k - 1]; // undefined on the first pane
       const right = boundaries[k]; // undefined on the last pane
+      // A split at stop i cuts after S{i+1}, between orderedSegs[i] (arriving)
+      // and orderedSegs[i+1] (leaving). So a pane owns the segments from just
+      // after its left split through its right split, inclusive of nulls
+      // (zero-length legs) which filter out in paneSummary.
+      const leftStop = left ? left.stopIdx : -1;
+      const rightStop = right ? right.stopIdx : nStops;
+      const segs = model.orderedSegs.slice(leftStop + 1, rightStop + 1).filter(Boolean);
+      const startTime = left ? data.stops[left.stopIdx].time_after_s : 0;
+      const endTime = right ? data.stops[right.stopIdx].time_before_s : model.endS;
       panes.push({
         range: {
           startIdx: left ? left.afterIdx : 0,
@@ -1246,13 +1306,22 @@ function buildMapArea(wrapper, data, model) {
           onClickStop,
           onRemoveSplit: left ? () => removeSplit(left.stopIdx) : undefined,
         },
+        segs,
+        elapsed: endTime - startTime,
       });
     }
-    wrapper.classList.toggle("split", splits.length > 0);
+    const isSplit = splits.length > 0;
+    wrapper.classList.toggle("split", isSplit);
     syncSplitStops();
-    const inners = panes.map(() => {
+    // Single-map mode keeps the whole-ride summary up top; only split panes
+    // carry their own summary, wrapped with the map in a .map-pane column.
+    const inners = panes.map((p) => {
       const d = el("div", { class: "leaflet-map" });
-      wrapper.appendChild(d);
+      if (isSplit) {
+        wrapper.appendChild(el("div", { class: "map-pane" }, d, paneSummary(p.segs, p.elapsed)));
+      } else {
+        wrapper.appendChild(d);
+      }
       return d;
     });
     // Leaflet needs the container in the DOM with size before init.
@@ -1511,23 +1580,6 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
     root.appendChild(el("div", { class: "source-links" }, ...links));
   }
 
-  const item = (label, value) =>
-    el(
-      "div",
-      { class: "item" },
-      el("span", { class: "label" }, `${label}:`),
-      el("span", { class: "value" }, value),
-    );
-
-  const dnRow = (state, value) =>
-    el(
-      "div",
-      { class: "dn-row" },
-      el("span", { class: "dn-dot", style: `background:${DAYNIGHT_COLORS[state]}` }),
-      el("span", { class: "dn-label" }, state),
-      el("span", { class: "dn-value" }, value),
-    );
-
   root.appendChild(
     el(
       "div",
@@ -1535,23 +1587,23 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
       el(
         "div",
         { class: "summary-col" },
-        item("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
-        item("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
-        item("Coast", fmtPct(a.coasting_frac)),
+        summaryItem("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
+        summaryItem("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+        summaryItem("Coast", fmtPct(a.coasting_frac)),
       ),
       el(
         "div",
         { class: "summary-col" },
-        item("Elapsed", fmtDur(a.elapsed_time_s)),
-        item("Moving", fmtDur(a.moving_time_s)),
+        summaryItem("Elapsed", fmtDur(a.elapsed_time_s)),
+        summaryItem("Moving", fmtDur(a.moving_time_s)),
         el(
           "div",
           { class: "breakdown" },
-          dnRow("day", fmtDur(a.moving_day_time_s)),
-          dnRow("twilight", fmtDur(a.moving_twilight_time_s)),
-          dnRow("night", fmtDur(a.moving_night_time_s)),
+          summaryDnRow("day", fmtDur(a.moving_day_time_s)),
+          summaryDnRow("twilight", fmtDur(a.moving_twilight_time_s)),
+          summaryDnRow("night", fmtDur(a.moving_night_time_s)),
         ),
-        item("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s)),
+        summaryItem("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s)),
       ),
     ),
   );

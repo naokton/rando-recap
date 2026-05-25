@@ -657,6 +657,58 @@ table.data.segments tr.row.split-border td {
   height: 100%;
   border: 1px solid var(--border);
 }
+/* Split mode: each pane is a column of [map, per-pane summary]. The map flexes
+   to fill whatever height the summary leaves within the resizable #map box. */
+#map .map-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#map .map-pane .leaflet-map {
+  height: auto;
+  min-height: 0;
+}
+.pane-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding: 6px 2px 2px;
+  font-size: 12px;
+}
+.pane-summary .item {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
+}
+.pane-summary .label {
+  color: var(--muted);
+}
+.pane-summary .value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.pane-summary .pane-dn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.pane-summary .pane-dn .dn-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pane-summary .pane-dn .dn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
 .leaflet-map.map-fullscreen {
   position: fixed !important;
   inset: 0;

@@ -1,3 +1,4 @@
+from rando_recap.daynight import Stretch, seconds_by_state
 from rando_recap.segments import build_segments, coasting_frac
 from rando_recap.stops import Stop
 from rando_recap.streams import Streams
@@ -102,6 +103,62 @@ def test_segment_carries_coasting_frac():
     )
     seg = build_segments(s, stops=[])[0]
     assert seg.coasting_frac == 2 / 4
+
+
+def test_moving_seconds_is_gap_excluded_riding_time():
+    # Mostly 60s cadence with two recording gaps (620s, 580s) that exceed the
+    # gap threshold (5 * median 60 = 300) and so never count as moving. The gaps
+    # fall on the stop boundaries (between segments), so each interior leg is
+    # fully moving and moving_s equals its elapsed time.
+    time_s = [0, 60, 120, 180, 800, 860, 920, 1500, 1560, 1620]
+    distance = [0.0, 1000, 2000, 3000, 3000.0, 4000, 5000, 5000.0, 6000, 7000]
+    s = _streams(time_s=time_s, distance=distance)
+    stops = [
+        Stop(3, 4, 0.0, 0.0, time_s[3], time_s[4]),
+        Stop(6, 7, 0.0, 0.0, time_s[6], time_s[7]),
+    ]
+    segs = build_segments(s, stops)
+    assert [seg.moving_s for seg in segs] == [180, 120, 120]
+    assert [seg.duration_s for seg in segs] == [180, 120, 120]
+
+
+def test_moving_seconds_equals_summed_state_seconds():
+    # moving_s is the same gap-excluded riding time the day/night breakdown sums.
+    time_s = [0, 60, 120, 180]
+    distance = [0.0, 1000.0, 2000.0, 3000.0]
+    s = _streams(time_s=time_s, distance=distance)
+    daynight = [Stretch("day", 0, 1), Stretch("night", 1, 3)]
+    seg = build_segments(s, stops=[], daynight=daynight)[0]
+    assert seg.moving_s == seg.day_s + seg.twilight_s + seg.night_s == 180
+
+
+def test_per_segment_state_seconds_sum_to_whole_ride():
+    time_s = [0, 60, 120, 180, 800, 860, 920]
+    distance = [0.0, 1000, 2000, 3000, 3000.0, 4000, 5000]
+    daynight = [Stretch("day", 0, 3), Stretch("twilight", 3, 6)]
+    s = _streams(time_s=time_s, distance=distance)
+    stops = [Stop(3, 4, 0.0, 0.0, time_s[3], time_s[4])]
+    segs = build_segments(s, stops, daynight=daynight)
+    pooled = {
+        "day": sum(seg.day_s for seg in segs),
+        "twilight": sum(seg.twilight_s for seg in segs),
+        "night": sum(seg.night_s for seg in segs),
+    }
+    whole = seconds_by_state(time_s, daynight)
+    # The 620s stop gap sits between the two segments and is excluded from both,
+    # exactly as the whole-ride figure excludes it.
+    assert pooled == whole
+
+
+def test_segment_carries_coasting_counts():
+    s = _streams(
+        time_s=[0, 60, 120, 180],
+        distance=[0.0, 1000.0, 2000.0, 3000.0],
+        cadence=[90, 0, 0, 80],
+    )
+    seg = build_segments(s, stops=[])[0]
+    assert (seg.coasting_n, seg.coasting_d) == (2, 4)
+    assert seg.coasting_n / seg.coasting_d == seg.coasting_frac
 
 
 def test_zero_length_segment_skipped():

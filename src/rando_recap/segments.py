@@ -10,7 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .daynight import gap_threshold, seconds_by_state_range
+
 if TYPE_CHECKING:
+    from .daynight import Stretch
     from .stops import Stop
     from .streams import Streams
 
@@ -31,6 +34,14 @@ class Segment:
     climb_m_per_km: float | None
     coasting_frac: float | None
     """Fraction of recorded samples with cadence == 0 (freewheeling)."""
+    moving_s: int
+    day_s: int
+    twilight_s: int
+    night_s: int
+    """Riding seconds spent in each lighting state."""
+    coasting_n: int
+    coasting_d: int
+    """Cadence-zero and cadence-present sample counts."""
 
 
 def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = False) -> float | None:
@@ -81,9 +92,34 @@ def _climb_sum(altitude: list[float] | None, lo: int, hi: int) -> float:
     return total
 
 
+def _moving_seconds(time_s: list[int], lo: int, hi: int, threshold: int) -> int:
+    """Moving seconds within ``[lo, hi]``: gap-free riding time.
+
+    Every inter-sample interval whose delta is at or below ``threshold`` counts;
+    larger deltas are recording pauses and are excluded. This is the same
+    gap-exclusion the day/night breakdown uses, so ``moving_s`` equals the
+    summed day/twilight/night seconds and the breakdown ties out exactly.
+    """
+    total = 0
+    for i in range(lo + 1, hi + 1):
+        d = time_s[i] - time_s[i - 1]
+        if d <= threshold:
+            total += d
+    return total
+
+
+def _coasting_counts(cadence: list | None, lo: int, hi: int) -> tuple[int, int]:
+    """(cadence-zero count, cadence-present count) over ``[lo, hi]``."""
+    if cadence is None:
+        return 0, 0
+    present = [v for v in cadence[lo : hi + 1] if v is not None]
+    return sum(1 for v in present if v == 0), len(present)
+
+
 def build_segments(
     streams: Streams,
     stops: list[Stop],
+    daynight: list[Stretch] | None = None,
 ) -> list[Segment]:
     """Build ordered segments from a ride's streams."""
     time_s = streams.time
@@ -97,6 +133,8 @@ def build_segments(
     if n == 0:
         return []
     last = n - 1
+    stretches = daynight or []
+    threshold = gap_threshold(time_s) if n >= 2 else 0
 
     # Split points: (label_from, index_start, index_end)
     boundaries: list[tuple[str, int, int]] = []
@@ -117,6 +155,8 @@ def build_segments(
         avg_speed = dist_m / dur_s if dur_s > 0 else None
         climb = _climb_sum(altitude, lo, hi)
         climb_per_km = climb / (dist_m / 1000.0) if dist_m > 0 else None
+        state_s = seconds_by_state_range(time_s, stretches, lo, hi, threshold)
+        coasting_n, coasting_d = _coasting_counts(cad, lo, hi)
         segments.append(
             Segment(
                 label=label,
@@ -131,6 +171,12 @@ def build_segments(
                 climb_m=climb,
                 climb_m_per_km=climb_per_km,
                 coasting_frac=coasting_frac(cad, lo, hi),
+                moving_s=_moving_seconds(time_s, lo, hi, threshold),
+                day_s=state_s["day"],
+                twilight_s=state_s["twilight"],
+                night_s=state_s["night"],
+                coasting_n=coasting_n,
+                coasting_d=coasting_d,
             )
         )
     return segments
