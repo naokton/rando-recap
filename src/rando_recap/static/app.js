@@ -1586,8 +1586,8 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
   );
   root.appendChild(
     buildSectionTabs([
-      { label: "Timeline", panel: timelinePanel },
       { label: "Tables", panel: tablesPanel },
+      { label: "Timeline", panel: timelinePanel },
     ]),
   );
 }
