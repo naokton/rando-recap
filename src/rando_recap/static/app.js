@@ -1202,10 +1202,10 @@ function paneSummary(segs, elapsedS) {
     { class: "pane-summary" },
     summaryItem("Dist", `${(sum((s) => s.distance_m) / 1000).toFixed(1)} km`),
     summaryItem("Climb", `${Math.round(sum((s) => s.climb_m))} m`),
-    summaryItem("Moving", fmtDur(movingS)),
-    summaryItem("Elapsed", fmtDur(elapsedS)),
-    summaryItem("Rest", fmtDur(Math.max(0, elapsedS - movingS))),
     summaryItem("Coast", fmtPct(coastFrac)),
+    summaryItem("Elapsed", fmtDur(elapsedS)),
+    summaryItem("Moving", fmtDur(movingS)),
+    summaryItem("Rest", fmtDur(Math.max(0, elapsedS - movingS))),
     el(
       "div",
       { class: "pane-dn" },
