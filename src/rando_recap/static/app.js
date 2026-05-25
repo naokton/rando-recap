@@ -1270,6 +1270,38 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     ),
   );
 
+  // Strava attribution: link displayed data back to its source activity on
+  // Strava. Combined rides expose their component ids as `combined:N,N,...`.
+  const rawId = String(a.id || "");
+  const sourceIds = rawId.startsWith("combined:")
+    ? rawId.slice("combined:".length).split(",").filter(Boolean)
+    : rawId
+      ? [rawId]
+      : [];
+  if (sourceIds.length) {
+    const multi = sourceIds.length > 1;
+    const links = [];
+    sourceIds.forEach((id, i) => {
+      if (i) links.push(" · ");
+      // Strava Brand Guidelines §3: the link text must read "View on Strava".
+      // For merged rides the ordinal stays inside the anchor so each link
+      // still leads with the required phrase.
+      links.push(
+        el(
+          "a",
+          {
+            class: "strava-link",
+            href: `https://www.strava.com/activities/${encodeURIComponent(id)}`,
+            target: "_blank",
+            rel: "noopener external",
+          },
+          multi ? `View on Strava (${i + 1})` : "View on Strava",
+        ),
+      );
+    });
+    root.appendChild(el("div", { class: "source-links" }, ...links));
+  }
+
   const item = (label, value) =>
     el(
       "div",

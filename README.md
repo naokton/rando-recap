@@ -127,3 +127,10 @@ as-is, and Leaflet is loaded from a CDN).
 ## License
 
 Source code is licensed under the MIT License (see [LICENSE](LICENSE)).
+
+The MIT license does **not** apply to third-party trademarks or brand assets.
+The Strava name, logos, and the "Powered by Strava" / "Connect with Strava"
+marks (e.g. files under `src/rando_recap/static/vendor/strava/`) are trademarks
+of Strava, Inc. They are included only for the attribution required by the
+[Strava API Agreement](https://www.strava.com/legal/api) and are governed by
+the Strava Brand Guidelines, not by this project's license.
