@@ -509,7 +509,7 @@ async function renderList(minDist) {
       ? `No rides match. ${data.total_cached} cached. Use “Fetch rides” to pull more from Strava, or lower the minimum distance.`
       : "No rides cached yet. Use “Fetch rides” to pull them from Strava.";
     body.replaceChildren(
-      el("div", { class: "list-toolbar" }, buildFilterControl(minDist), buildFetchControl()),
+      el("div", { class: "list-toolbar" }, buildFetchControl(), buildFilterControl(minDist)),
       el("div", { class: "empty" }, message),
     );
     return;
@@ -519,8 +519,10 @@ async function renderList(minDist) {
   const selected = new Set();
 
   const toolbar = el("div", { class: "list-toolbar" });
+  const filterControl = buildFilterControl(minDist);
+  const fetchControl = buildFetchControl();
   const mergeControls = el("div", { class: "merge-controls" });
-  toolbar.append(buildFilterControl(minDist), buildFetchControl(), mergeControls);
+  toolbar.append(mergeControls, fetchControl, filterControl);
   const table = el("table", { class: "rides" });
   body.replaceChildren(toolbar, table);
 
@@ -541,6 +543,9 @@ async function renderList(minDist) {
 
   const renderToolbar = () => {
     mergeControls.replaceChildren();
+    // In merge mode only Cancel/Open show; the filter and fetch controls hide.
+    filterControl.classList.toggle("hidden", mergeMode);
+    fetchControl.classList.toggle("hidden", mergeMode);
     if (!mergeMode) {
       mergeControls.appendChild(
         el(

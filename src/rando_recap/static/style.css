@@ -284,13 +284,13 @@ main {
 .list-toolbar {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
   margin-bottom: 12px;
   max-width: 900px;
 }
 .merge-controls {
   display: flex;
   gap: 8px;
-  margin-left: auto;
 }
 
 /* Filter popover */
