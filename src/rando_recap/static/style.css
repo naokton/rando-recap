@@ -42,7 +42,7 @@ header {
 }
 header h1 {
   margin: 0;
-  font-size: 32px;
+  font-size: 28px;
   font-weight: 600;
 }
 header a {
@@ -69,8 +69,8 @@ header a:hover {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   cursor: pointer;
   color: var(--fg);
   display: inline-flex;
@@ -78,8 +78,8 @@ header a:hover {
   justify-content: center;
 }
 .config-btn::before {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/settings.svg");
 }
 .config-btn:hover {

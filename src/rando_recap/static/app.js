@@ -1008,10 +1008,10 @@ function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
   return lines;
 }
 
-function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
-  // Only draw the global Start/End markers when the map's range actually
-  // reaches the track ends; on the inner side of a split there's no
-  // dedicated split marker — the polyline simply ends.
+function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops, startSplitStop, endSplitStop) {
+  // Each pane gets a pin at both ends. The outer ends use the ride's global
+  // Start/End when the range reaches the track ends; otherwise the border is a
+  // split stop, drawn as a pin on both panes it divides.
   const last = latlng.length - 1;
   const iconHighlight = (marker) => (on) => {
     const elt = marker.getElement();
@@ -1022,24 +1022,36 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS) {
       .addTo(map)
       .bindPopup(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`);
     registerMapPeer("stop", "start", start, iconHighlight(start));
+  } else if (startSplitStop != null) {
+    // Split stop opening this pane: a Start-like pin showing departure time.
+    const c = stops[startSplitStop];
+    const pin = L.marker([c.lat, c.lng])
+      .addTo(map)
+      .bindPopup(`<b>S${startSplitStop + 1}</b><br>departs ${fmtClock(c.time_after_s)}`);
+    registerMapPeer("stop", `c${startSplitStop}`, pin, iconHighlight(pin));
   }
   if (range.endIdx === last) {
     const end = L.marker(latlng[last])
       .addTo(map)
       .bindPopup(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`);
     registerMapPeer("stop", "end", end, iconHighlight(end));
+  } else if (endSplitStop != null) {
+    // Split stop closing this pane: an End-like pin showing arrival time.
+    const c = stops[endSplitStop];
+    const pin = L.marker([c.lat, c.lng])
+      .addTo(map)
+      .bindPopup(`<b>S${endSplitStop + 1}</b><br>arrives ${fmtClock(c.time_before_s)}`);
+    registerMapPeer("stop", `c${endSplitStop}`, pin, iconHighlight(pin));
   }
 }
 
-function drawStopMarkers(map, stops, range, splitStops, onClickStop) {
-  // splitStops are the split stops bordering this pane: each anchors the
-  // boundary it owns, so it's shown here even though it falls outside the
-  // pane's index range.
+function drawStopMarkers(map, stops, range, onClickStop, startSplitStop, endSplitStop) {
   const visible = stops
     .map((c, i) => ({ c, i }))
     .filter(({ c, i }) => {
-      const inRange = c.index_before >= range.startIdx && c.index_before <= range.endIdx;
-      return inRange || splitStops.has(i);
+      // The stops bordering this pane are drawn as start/end pins, not circles.
+      if (i === startSplitStop || i === endSplitStop) return false;
+      return c.index_before >= range.startIdx && c.index_before <= range.endIdx;
     });
   if (!visible.length) return null;
   // Radius normalization uses the global maxRest so marker sizes are
@@ -1077,7 +1089,6 @@ function drawStopMarkers(map, stops, range, splitStops, onClickStop) {
     });
     if (onClickStop) {
       marker.on("click", (ev) => {
-        if (splitStops.has(i)) return;
         openMarkerMenu(ev.originalEvent, [{ label: "Split here", onSelect: () => onClickStop(i) }]);
       });
     }
@@ -1134,8 +1145,8 @@ function renderMap(container, data, model, range, ctx) {
 
   const hasDaynight = drawDaynightPath(map, latlng, daynight, range);
   const segLines = drawSegmentLines(map, latlng, segments, hasDaynight, range);
-  drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS);
-  const stopsLayer = drawStopMarkers(map, stops, range, ctx.splitStops, ctx.onClickStop);
+  drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops, ctx.startSplitStop, ctx.endSplitStop);
+  const stopsLayer = drawStopMarkers(map, stops, range, ctx.onClickStop, ctx.startSplitStop, ctx.endSplitStop);
   if (hasDaynight) addMapLegend(map, !!stopsLayer);
 
   const bounds = segLines.length
@@ -1302,7 +1313,8 @@ function buildMapArea(mapWrap, summaryWrap, data, model) {
           endIdx: right ? right.beforeIdx : last,
         },
         ctx: {
-          splitStops: new Set([left, right].filter(Boolean).map((b) => b.stopIdx)),
+          startSplitStop: left ? left.stopIdx : null,
+          endSplitStop: right ? right.stopIdx : null,
           onClickStop,
           onRemoveSplit: left ? () => removeSplit(left.stopIdx) : undefined,
         },
