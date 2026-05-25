@@ -1,14 +1,13 @@
-"""CLI entry point: ``ride analyze <activity_id>``, ``ride fetch``, ``ride serve``.
+"""CLI entry point: ``ride analyze <activity_id>``, ``ride list``, ``ride serve``.
 
-Authentication is web-based: run ``ride serve`` and click "Sign in with Strava".
-The browser flow writes the same token file the CLI commands read.
+Authentication and fetching activities are web-based: run ``ride serve``, click
+"Sign in with Strava", then use the in-app "Fetch rides" button. The browser flow
+writes the same token + cache the CLI commands read.
 """
 
 from __future__ import annotations
 
-import re
 import sys
-from datetime import datetime, timedelta
 
 import click
 
@@ -16,7 +15,6 @@ from .app import (
     ActivityNotCachedError,
     ConfigError,
     MissingStreamsError,
-    Summary,
     analyze_activity,
     client,
     list_summaries,
@@ -24,7 +22,7 @@ from .app import (
 )
 from .payload import render_json
 from .report import render_terminal
-from .strava import StravaClient, StravaRateLimitError, StravaScopeError
+from .strava import StravaClient, StravaScopeError
 
 
 def _client() -> StravaClient:
@@ -32,29 +30,6 @@ def _client() -> StravaClient:
         return client()
     except ConfigError as e:
         raise click.ClickException(str(e)) from e
-
-
-_SINCE_RE = re.compile(r"^(\d+)\s*([dwmy])$", re.IGNORECASE)
-_SINCE_DAYS = {"d": 1, "w": 7, "m": 30, "y": 365}
-
-
-def _parse_since(value: str) -> int | None:
-    """Parse '1m' / '6m' / '1y' / 'all' / 'YYYY-MM-DD' → epoch seconds (or None for 'all')."""
-    raw = value.strip()
-    if raw.lower() == "all":
-        return None
-    m = _SINCE_RE.match(raw)
-    if m:
-        n = int(m.group(1))
-        unit = m.group(2).lower()
-        delta = timedelta(days=n * _SINCE_DAYS[unit])
-        return int((datetime.now() - delta).timestamp())
-    try:
-        return int(datetime.strptime(raw, "%Y-%m-%d").timestamp())
-    except ValueError as e:
-        raise click.BadParameter(
-            f"unrecognized --since value: {value!r}. Use Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD."
-        ) from e
 
 
 @click.group()
@@ -117,41 +92,6 @@ def analyze(
         sys.stdout.write("\n")
     else:
         render_terminal(result.activity, result.stops, result.segments, result.coasting_frac)
-
-
-@main.command()
-@click.option(
-    "--since",
-    default="1m",
-    show_default=True,
-    help="Window: Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD.",
-)
-@click.option("--refresh", is_flag=True, help="Overwrite cached summaries even if already present.")
-def fetch(since: str, refresh: bool) -> None:
-    """Cache every activity summary in --since window. Filtering happens at list time."""
-    sclient = _client()
-    if not sclient.authenticated:
-        raise click.ClickException("Not authenticated. Run `ride serve` and sign in with Strava first.")
-
-    after = _parse_since(since)
-    seen = added = skipped_cached = 0
-    try:
-        for activity in sclient.list_athlete_activities(after=after):
-            seen += 1
-            sid = int(activity["id"])
-            summary = Summary.from_activity(activity)
-            label = f"{summary.datetime[:10]}  {summary.distance_km:6.1f} km  {summary.name}"
-            if not refresh and sclient.cache.has("summary", sid):
-                skipped_cached += 1
-                click.echo(f"  cached  {label}")
-                continue
-            click.echo(f"  add     {label}")
-            sclient.cache.set("summary", sid, activity)
-            added += 1
-    except (StravaScopeError, StravaRateLimitError) as e:
-        raise click.ClickException(str(e)) from e
-
-    click.echo(f"\nDone. seen={seen}  added={added}  skipped(cached)={skipped_cached}")
 
 
 @main.command(name="list")

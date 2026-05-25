@@ -6,9 +6,9 @@ import functools
 import os
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 from platformdirs import user_cache_dir, user_config_dir
@@ -19,6 +19,9 @@ from .segments import Segment, build_segments, coasting_frac
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
 from .streams import MissingStreamsError, Streams
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 APP_NAME = "rando-recap"
 
@@ -59,6 +62,32 @@ def parse_duration(value: str) -> int:
     return n * {"s": 1, "m": 60, "h": 3600}[unit]
 
 
+_SINCE_RE = re.compile(r"^(\d+)\s*([dwmy])$", re.IGNORECASE)
+_SINCE_DAYS = {"d": 1, "w": 7, "m": 30, "y": 365}
+
+
+def parse_since(value: str) -> int | None:
+    """Parse '1m' / '6m' / '1y' / 'all' / 'YYYY-MM-DD' → epoch seconds (None for 'all').
+
+    Raises ValueError on unrecognized input.
+    """
+    raw = value.strip()
+    if raw.lower() == "all":
+        return None
+    m = _SINCE_RE.match(raw)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2).lower()
+        delta = timedelta(days=n * _SINCE_DAYS[unit])
+        return int((datetime.now() - delta).timestamp())
+    try:
+        return int(datetime.strptime(raw, "%Y-%m-%d").timestamp())
+    except ValueError as e:
+        raise ValueError(
+            f"unrecognized since value: {value!r}. Use Nd/Nw/Nm/Ny (e.g. 1m, 6m, 1y), 'all', or YYYY-MM-DD."
+        ) from e
+
+
 @dataclass(frozen=True)
 class Summary:
     datetime: str
@@ -97,6 +126,44 @@ def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int,
         rows.append((sid, Summary.from_activity(activity)))
     rows.sort(key=lambda r: r[1].datetime, reverse=True)
     return total, rows
+
+
+@dataclass(frozen=True)
+class FetchProgress:
+    """One activity processed by :func:`fetch_summaries`.
+
+    ``action`` is ``"add"`` when the summary was newly cached (or overwritten on
+    refresh) or ``"cached"`` when it was already present and left untouched.
+    """
+
+    action: str
+    id: int
+    datetime: str
+    distance_km: float
+    name: str
+
+
+def fetch_summaries(
+    sclient: StravaClient,
+    after: int | None,
+    *,
+    refresh: bool = False,
+) -> Iterator[FetchProgress]:
+    """Cache every activity summary newer than ``after`` (epoch seconds, None = all).
+
+    Yields a :class:`FetchProgress` per activity as it goes so callers can stream
+    progress. Filtering by distance/sport_type happens at list time, not here.
+    Auth is the caller's job. Raises StravaScopeError / StravaRateLimitError.
+    """
+    for activity in sclient.list_athlete_activities(after=after):
+        sid = int(activity["id"])
+        summary = Summary.from_activity(activity)
+        if not refresh and sclient.cache.has("summary", sid):
+            action = "cached"
+        else:
+            sclient.cache.set("summary", sid, activity)
+            action = "add"
+        yield FetchProgress(action, sid, summary.datetime, summary.distance_km, summary.name)
 
 
 @dataclass(frozen=True)

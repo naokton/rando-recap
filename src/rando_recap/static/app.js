@@ -4,7 +4,17 @@ const root = document.getElementById("root");
 const DEFAULT_MIN_DIST_KM = 190;
 const DEFAULT_MIN_STOP = "5m";
 const DEFAULT_MERGE_WITHIN_M = 100;
+const DEFAULT_FETCH_SINCE = "1m";
 const STORAGE_KEY_USER_PARAMS = "rando-recap.user-params";
+// Windows offered by the Fetch popover; values are what the API's `since` param
+// accepts (Nd/Nw/Nm/Ny or 'all'). Labels are user-facing.
+const FETCH_WINDOWS = [
+  { value: "1w", label: "Last week" },
+  { value: "1m", label: "Last month" },
+  { value: "6m", label: "Last 6 months" },
+  { value: "1y", label: "Last year" },
+  { value: "all", label: "All time" },
+];
 // Mirror of the backend floor (stops.py MIN_STOP_FLOOR_S): the ~1s sample
 // interval means a threshold at or below 1s flags every point as a stop, so
 // the API rejects it. Require strictly more than this in the form too.
@@ -43,6 +53,7 @@ function loadUserParams() {
               ? parsed.minStop
               : DEFAULT_MIN_STOP,
           mergeWithinM: parseMergeWithin(parsed.mergeWithinM),
+          fetchSince: parseFetchSince(parsed.fetchSince),
         };
       }
     }
@@ -51,6 +62,7 @@ function loadUserParams() {
     minDist: DEFAULT_MIN_DIST_KM,
     minStop: DEFAULT_MIN_STOP,
     mergeWithinM: DEFAULT_MERGE_WITHIN_M,
+    fetchSince: DEFAULT_FETCH_SINCE,
   };
 }
 
@@ -248,6 +260,10 @@ function parseMergeWithin(s) {
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_MERGE_WITHIN_M;
 }
 
+function parseFetchSince(s) {
+  return FETCH_WINDOWS.some((w) => w.value === s) ? s : DEFAULT_FETCH_SINCE;
+}
+
 // Toolbar popover holding the rides-list filters (currently just minimum
 // distance). Applying routes via the hash so the list re-fetches through route().
 function buildFilterControl(minDist) {
@@ -302,6 +318,177 @@ function buildFilterControl(minDist) {
   return wrap;
 }
 
+// Toolbar popover that pulls activity summaries from Strava. Picking a window
+// and submitting hands off to renderFetch, which streams progress.
+function buildFetchControl() {
+  const saved = loadUserParams();
+  const select = el(
+    "select",
+    { class: "fetch-since" },
+    ...FETCH_WINDOWS.map((w) => el("option", { value: w.value }, w.label)),
+  );
+  select.value = saved.fetchSince;
+  const form = el(
+    "form",
+    { class: "filter-panel" },
+    el("div", { class: "field fetch-field" }, el("label", {}, "Fetch rides from"), select),
+    el(
+      "div",
+      { class: "filter-footer" },
+      el("button", { type: "submit", class: "btn primary" }, "Fetch"),
+    ),
+  );
+  const btn = el(
+    "button",
+    { class: "btn fetch-btn", type: "button", title: "Fetch rides from Strava" },
+    "Fetch rides",
+  );
+  const wrap = el("div", { class: "filter-wrap fetch-wrap" }, btn, form);
+
+  const close = () => {
+    wrap.classList.remove("open");
+    document.removeEventListener("mousedown", onOutside);
+  };
+  const onOutside = (e) => {
+    if (!wrap.contains(e.target)) close();
+  };
+  btn.addEventListener("click", () => {
+    if (wrap.classList.toggle("open")) document.addEventListener("mousedown", onOutside);
+    else close();
+  });
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    close();
+    const since = parseFetchSince(select.value);
+    saveUserParams({ fetchSince: since });
+    renderFetch(since);
+  });
+
+  return wrap;
+}
+
+// Consume the SSE stream from POST /api/fetch, invoking callbacks per event.
+// Uses a fetch() reader (not EventSource, which can't POST) and parses the
+// `data: <json>\n\n` frames by hand. `signal` aborts an in-flight fetch when
+// the view unmounts.
+async function streamFetch(since, signal, { onProgress, onDone, onError }) {
+  let resp;
+  try {
+    resp = await fetch(`/api/fetch?since=${encodeURIComponent(since)}`, { method: "POST", signal });
+  } catch (e) {
+    if (e.name !== "AbortError") onError(e.message);
+    return;
+  }
+  if (!resp.ok) {
+    let msg = `${resp.status} ${resp.statusText}`;
+    try {
+      const body = await resp.json();
+      if (body.detail) msg = body.detail;
+    } catch {}
+    onError(msg);
+    return;
+  }
+  const dispatch = (frame) => {
+    const line = frame.split("\n").find((l) => l.startsWith("data:"));
+    if (!line) return;
+    let ev;
+    try {
+      ev = JSON.parse(line.slice(5).trim());
+    } catch {
+      return;
+    }
+    if (ev.type === "progress") onProgress(ev);
+    else if (ev.type === "done") onDone(ev);
+    else if (ev.type === "error") onError(ev.detail);
+  };
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let sep;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        dispatch(buf.slice(0, sep));
+        buf = buf.slice(sep + 2);
+      }
+    }
+    // Flush a final frame that arrived without its trailing blank line so a
+    // terminal done/error event isn't lost to proxy buffering / abrupt close.
+    if (buf.trim()) dispatch(buf);
+  } catch (e) {
+    if (e.name !== "AbortError") onError(e.message);
+  }
+}
+
+// Full-screen progress view shown while a fetch runs: a live log mirroring the
+// old CLI output, running counts, and a "Back to rides" exit that re-renders the
+// list (so freshly fetched rides show). Aborts the stream if unmounted early.
+function renderFetch(since) {
+  unmountCurrentView();
+  root.innerHTML = "";
+
+  const counts = el("div", { class: "fetch-counts" });
+  const log = el("div", { class: "fetch-log" });
+  const footer = el("div", { class: "fetch-footer" });
+  root.appendChild(
+    el("div", { class: "fetch-view" }, el("h2", {}, "Fetching rides"), counts, log, footer),
+  );
+
+  const controller = new AbortController();
+  currentView = { unmount: () => controller.abort() };
+
+  let seen = 0;
+  let added = 0;
+  let skipped = 0;
+  const setCounts = (status) => {
+    counts.textContent = `seen ${seen} · added ${added} · skipped ${skipped}${
+      status ? ` — ${status}` : ""
+    }`;
+  };
+  setCounts("starting…");
+
+  const appendLine = (cls, text) => {
+    log.appendChild(el("div", { class: `fetch-line ${cls}` }, text));
+    log.scrollTop = log.scrollHeight;
+  };
+  const showBack = () => {
+    // The fetch view never changed the hash, so it still encodes the list. A
+    // plain route() re-parses it and re-renders the (now repopulated) list.
+    footer.appendChild(
+      el("button", { class: "btn", type: "button", onclick: () => route() }, "Back to rides"),
+    );
+  };
+
+  streamFetch(since, controller.signal, {
+    onProgress: (ev) => {
+      seen += 1;
+      if (ev.action === "add") added += 1;
+      else skipped += 1;
+      setCounts("");
+      const km = (ev.distance_km ?? 0).toFixed(1).padStart(6);
+      appendLine(
+        ev.action,
+        `${ev.action.padEnd(7)}${(ev.datetime || "").slice(0, 10)}  ${km} km  ${ev.name || ""}`,
+      );
+    },
+    onDone: (ev) => {
+      setCounts("done");
+      appendLine("done", `Done. seen=${ev.seen} added=${ev.added} skipped=${ev.skipped}`);
+      showBack();
+    },
+    onError: (detail) => {
+      setCounts("failed");
+      appendLine("error", detail);
+      showBack();
+    },
+  });
+}
+
 async function renderList(minDist) {
   saveUserParams({ minDist });
   root.innerHTML = "";
@@ -318,15 +505,12 @@ async function renderList(minDist) {
   }
 
   if (!data.rides.length) {
+    const message = data.total_cached
+      ? `No rides match. ${data.total_cached} cached. Use “Fetch rides” to pull more from Strava, or lower the minimum distance.`
+      : "No rides cached yet. Use “Fetch rides” to pull them from Strava.";
     body.replaceChildren(
-      el("div", { class: "list-toolbar" }, buildFilterControl(minDist)),
-      el(
-        "div",
-        { class: "empty" },
-        `No rides match. ${data.total_cached} cached. Run `,
-        el("code", {}, "ride fetch"),
-        " to populate, or lower the minimum distance.",
-      ),
+      el("div", { class: "list-toolbar" }, buildFilterControl(minDist), buildFetchControl()),
+      el("div", { class: "empty" }, message),
     );
     return;
   }
@@ -336,7 +520,7 @@ async function renderList(minDist) {
 
   const toolbar = el("div", { class: "list-toolbar" });
   const mergeControls = el("div", { class: "merge-controls" });
-  toolbar.append(buildFilterControl(minDist), mergeControls);
+  toolbar.append(buildFilterControl(minDist), buildFetchControl(), mergeControls);
   const table = el("table", { class: "rides" });
   body.replaceChildren(toolbar, table);
 

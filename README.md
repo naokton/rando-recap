@@ -42,10 +42,13 @@ uv run app serve --reload              # dev: auto-reload on code change
 Routes:
 
 - `/` — ride list (filtered by minimum distance). Click a ride for the
-  analysis view: map, timeline, stops table, segments table.
+  analysis view: map, timeline, stops table, segments table. The **Fetch
+  rides** button pulls activity summaries from Strava (see below).
 - `/api/rides` — JSON list of cached rides. Query: `min_distance_km`, `types`.
 - `/api/rides/{activity_id}/analysis` — JSON analysis. Query: `min_stop`,
   `refresh`.
+- `POST /api/fetch` — cache activity summaries, streaming progress as
+  Server-Sent Events. Query: `since`, `refresh`.
 
 The analysis view shows a route polyline colored by day/night (using sunrise
 / sunset for the ride's location and date), stop markers, and a segment
@@ -56,8 +59,24 @@ UI state lives in the URL hash: `#min_dist=190` on the list, and
 `#ride=<id>&min_stop=5m` on the analysis page — refresh-safe and shareable.
 
 The server is single-user with no auth; bind to `127.0.0.1` unless you know
-what you're doing. Populate the local cache with `uv run app fetch` first
-(see below).
+what you're doing. On first run the list is empty — click **Fetch rides** to
+populate the local cache (see below).
+
+### Fetch rides
+
+The **Fetch rides** button walks your Strava history and stashes each
+activity's summary metadata locally. Only the listing endpoint is hit (~1 call
+per 200 activities, no per-ride detail call) — the summary already carries
+every field the analysis needs; streams are fetched on demand when you open a
+ride.
+
+Pick a window (last week through all-time) and the fetch streams its progress
+live. It's idempotent — already-cached rides are skipped — and respects
+Strava's rate limits (sleeps near the 100-req / 15-minute cap, retries once on
+429, aborts on daily-limit exhaustion).
+
+Filtering by sport type and minimum distance happens at list time, not at fetch
+time, so you can change the threshold without re-fetching.
 
 ## CLI
 
@@ -77,26 +96,7 @@ The terminal report shows:
   climb (m), climb m/km. Within a segment elapsed time = moving time, since
   paused intervals only appear at stops.
 
-### Bulk-cache rides
-
-`app fetch` walks your Strava history and stashes each activity's summary
-metadata locally. Only the listing endpoint is hit (~1 call per 200
-activities, no per-ride detail call) — the summary already carries every
-field `analyze` needs. Streams are still fetched on demand by `analyze`.
-
-```bash
-uv run app fetch                          # last month
-uv run app fetch --since all              # first-time full sync
-uv run app fetch --since 6m
-```
-
-`--since` accepts `Nd` / `Nw` / `Nm` / `Ny` (days/weeks/months/years), `all`,
-or a `YYYY-MM-DD` date. The command is idempotent — already-cached rides are
-skipped — and respects Strava's rate limits (sleeps near the 100-req /
-15-minute cap, retries once on 429, aborts on daily-limit exhaustion).
-
-Filtering by sport type and minimum distance happens at list / serve time,
-not at fetch time, so you can change the threshold without re-fetching.
+### List cached rides
 
 To see which rides are in the cache (and grab an id for `analyze`):
 

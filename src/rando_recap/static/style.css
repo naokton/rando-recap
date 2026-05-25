@@ -332,6 +332,61 @@ main {
   display: flex;
   justify-content: flex-end;
 }
+/* Stack the label above a full-width select so the window names ("Last 6
+   months") aren't squeezed by the label sharing the row. */
+.fetch-field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.fetch-field label {
+  flex: none;
+}
+.fetch-since {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  width: 100%;
+}
+
+/* Fetch progress view */
+.fetch-view {
+  max-width: 900px;
+}
+.fetch-counts {
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.fetch-log {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--bg-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+.fetch-line {
+  white-space: pre;
+}
+.fetch-line.cached {
+  color: var(--muted);
+}
+.fetch-line.done {
+  margin-top: 8px;
+  font-weight: 600;
+}
+.fetch-line.error {
+  color: #b91c1c;
+  white-space: pre-wrap;
+}
+.fetch-footer {
+  margin-top: 12px;
+}
 table.rides {
   border-collapse: collapse;
   width: 100%;

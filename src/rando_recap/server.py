@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .app import (
@@ -18,11 +19,16 @@ from .app import (
     analyze_activity,
     analyze_combined,
     client,
+    fetch_summaries,
     list_summaries,
     parse_duration,
+    parse_since,
 )
 from .payload import build_payload
-from .strava import StravaClient, StravaScopeError
+from .strava import StravaClient, StravaRateLimitError, StravaScopeError
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -41,6 +47,17 @@ def index() -> FileResponse:
 # server restart mid-login just means clicking "Sign in" again; persisted
 # tokens (token.json) keep already-authenticated users signed in across restarts.
 _pending_state: str | None = None
+
+# Single-flight guard for /api/fetch. Like _pending_state, one value suffices for
+# single-user local T3: only one fetch should run at a time (concurrent runs
+# would race on the same cache rows for no benefit), and the streaming endpoint
+# clears it in a finally so a disconnect or crash can't wedge it on.
+_fetch_running = False
+
+
+def _sse(event: dict[str, Any]) -> str:
+    """Encode one Server-Sent Event carrying a JSON payload."""
+    return f"data: {json.dumps(event)}\n\n"
 
 
 def _require_client() -> StravaClient:
@@ -101,6 +118,65 @@ def list_rides(
             for sid, s in rows
         ],
     }
+
+
+@app.post("/api/fetch")
+def fetch_rides(
+    since: str = Query("1m"),
+    refresh: bool = Query(False),
+) -> StreamingResponse:
+    """Cache activity summaries in the ``since`` window, streaming progress as SSE.
+
+    Validates auth / config / params and the single-flight guard up front (so the
+    client gets a real status code), then streams ``progress`` events per activity,
+    a terminal ``done`` event, or an ``error`` event if Strava rejects the run.
+    """
+    global _fetch_running
+    c = _require_client()
+    if not c.authenticated:
+        raise HTTPException(status_code=401, detail="Not authenticated. Sign in with Strava first.")
+    try:
+        after = parse_since(since)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    if _fetch_running:
+        raise HTTPException(status_code=409, detail="A fetch is already in progress.")
+    _fetch_running = True
+
+    def stream() -> Iterator[str]:
+        global _fetch_running
+        seen = added = skipped = 0
+        try:
+            for p in fetch_summaries(c, after, refresh=refresh):
+                seen += 1
+                if p.action == "add":
+                    added += 1
+                else:
+                    skipped += 1
+                yield _sse(
+                    {
+                        "type": "progress",
+                        "action": p.action,
+                        "id": p.id,
+                        "datetime": p.datetime,
+                        "distance_km": p.distance_km,
+                        "name": p.name,
+                    }
+                )
+            yield _sse({"type": "done", "seen": seen, "added": added, "skipped": skipped})
+        except (StravaScopeError, StravaRateLimitError) as e:
+            yield _sse({"type": "error", "detail": str(e)})
+        except Exception as e:
+            # HTTP 200 + headers are already sent, so an unhandled exception
+            # (Strava 5xx, token-refresh failure, malformed activity, …) can't
+            # become an error status. Surface it as a terminal error frame so the
+            # client always gets a terminal event and shows "Back to rides"
+            # instead of hanging on "starting…".
+            yield _sse({"type": "error", "detail": f"Fetch failed: {e}"})
+        finally:
+            _fetch_running = False
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 def _parse_activity_id(activity_id: str) -> int | list[int]:
