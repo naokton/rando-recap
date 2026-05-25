@@ -11,11 +11,3 @@ used under the Strava Brand Guidelines.
   Strava API Agreement:   https://www.strava.com/legal/api
   Strava Brand Guidelines / logo downloads:
                           https://developers.strava.com/guidelines/
-
-Expected asset (download from the link above and place it here):
-
-  powered-by-strava.svg
-      The official "Powered by Strava" horizontal logo, orange-on-light
-      variant (the app uses a light theme). Referenced by the site footer in
-      ../../index.html. Do not recreate, recolor, or otherwise modify the
-      mark; use the official file as distributed by Strava.
