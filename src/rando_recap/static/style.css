@@ -113,11 +113,10 @@ main {
 .source-links .label {
   margin-right: 6px;
 }
+/* Strava Brand Guidelines §3: data links must be identifiable as links via
+   bold, underline, or orange #FC5200. Persistent underline satisfies this. */
 .source-links a.strava-link {
   color: var(--accent);
-  text-decoration: none;
-}
-.source-links a.strava-link:hover {
   text-decoration: underline;
 }
 

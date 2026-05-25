@@ -1279,9 +1279,13 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
       ? [rawId]
       : [];
   if (sourceIds.length) {
+    const multi = sourceIds.length > 1;
     const links = [];
     sourceIds.forEach((id, i) => {
       if (i) links.push(" · ");
+      // Strava Brand Guidelines §3: the link text must read "View on Strava".
+      // For merged rides the ordinal prefix is plain text, outside the link.
+      if (multi) links.push(`(${i + 1}) `);
       links.push(
         el(
           "a",
@@ -1291,7 +1295,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
             target: "_blank",
             rel: "noopener external",
           },
-          sourceIds.length > 1 ? `Activity ${i + 1}` : "View on Strava",
+          "View on Strava",
         ),
       );
     });
@@ -1299,7 +1303,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
       el(
         "div",
         { class: "source-links" },
-        el("span", { class: "label" }, sourceIds.length > 1 ? "Source activities:" : "Source:"),
+        el("span", { class: "label" }, multi ? "Source activities:" : "Source:"),
         ...links,
       ),
     );
