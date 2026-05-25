@@ -123,3 +123,7 @@ uv run pytest
 Requires Python ≥ 3.14. Frontend tooling installs via `npm install`
 (devDependencies only — there's no JS build step; `static/` is served
 as-is, and Leaflet is loaded from a CDN).
+
+## License
+
+Source code is licensed under the MIT License (see [LICENSE](LICENSE)).
