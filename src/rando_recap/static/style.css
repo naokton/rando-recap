@@ -90,6 +90,37 @@ main {
   padding: 16px 24px 32px;
 }
 
+/* Strava attribution: required by the Strava API Agreement / Brand Guidelines
+   wherever Strava data is displayed. The logo asset is third-party and not
+   covered by this project's MIT license (see static/vendor/strava/NOTICE). */
+.site-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.strava-attribution img {
+  display: block;
+  height: 20px;
+  width: auto;
+}
+.source-links {
+  margin: -4px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.source-links .label {
+  margin-right: 6px;
+}
+.source-links a.strava-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.source-links a.strava-link:hover {
+  text-decoration: underline;
+}
+
 /* Config dialog */
 #config-dialog {
   border: 1px solid var(--border);

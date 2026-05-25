@@ -1270,6 +1270,41 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
     ),
   );
 
+  // Strava attribution: link displayed data back to its source activity on
+  // Strava. Combined rides expose their component ids as `combined:N,N,...`.
+  const rawId = String(a.id || "");
+  const sourceIds = rawId.startsWith("combined:")
+    ? rawId.slice("combined:".length).split(",").filter(Boolean)
+    : rawId
+      ? [rawId]
+      : [];
+  if (sourceIds.length) {
+    const links = [];
+    sourceIds.forEach((id, i) => {
+      if (i) links.push(" · ");
+      links.push(
+        el(
+          "a",
+          {
+            class: "strava-link",
+            href: `https://www.strava.com/activities/${encodeURIComponent(id)}`,
+            target: "_blank",
+            rel: "noopener external",
+          },
+          sourceIds.length > 1 ? `Activity ${i + 1}` : "View on Strava",
+        ),
+      );
+    });
+    root.appendChild(
+      el(
+        "div",
+        { class: "source-links" },
+        el("span", { class: "label" }, sourceIds.length > 1 ? "Source activities:" : "Source:"),
+        ...links,
+      ),
+    );
+  }
+
   const item = (label, value) =>
     el(
       "div",
