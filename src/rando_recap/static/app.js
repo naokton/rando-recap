@@ -1182,8 +1182,7 @@ function summaryDnRow(state, value) {
   return el(
     "div",
     { class: "dn-row" },
-    el("span", { class: "dn-dot", style: `background:${DAYNIGHT_COLORS[state]}` }),
-    el("span", { class: "dn-label" }, state),
+    el("span", { class: `dn-label icon dn-${state}`, title: state }),
     el("span", { class: "dn-value" }, value),
   );
 }

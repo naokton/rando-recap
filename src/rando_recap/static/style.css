@@ -494,7 +494,7 @@ table.rides.merge-mode tbody tr.selected:hover {
 }
 .summary .breakdown {
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto;
   align-items: center;
   gap: 3px 8px;
   padding-left: 14px;
@@ -505,13 +505,21 @@ table.rides.merge-mode tbody tr.selected:hover {
 .summary .breakdown .dn-row {
   display: contents;
 }
-.summary .breakdown .dn-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
 .summary .breakdown .dn-value {
   justify-self: end;
+}
+.dn-label.icon::before {
+  width: 14px;
+  height: 14px;
+}
+.dn-day {
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/sun.svg");
+}
+.dn-twilight {
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/haze.svg");
+}
+.dn-night {
+  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/moon.svg");
 }
 
 /* Timeline */
@@ -708,11 +716,6 @@ table.data.segments tr.row.split-border td {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
-}
-.pane-summary .pane-dn .dn-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
 }
 .leaflet-map.map-fullscreen {
   position: fixed !important;
