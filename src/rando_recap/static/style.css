@@ -669,6 +669,7 @@ table.data.segments tr.row.split-border td {
 }
 .pane-summaries.split {
   margin-top: 4px;
+  align-items: flex-start;
 }
 #map .leaflet-map {
   height: 100%;
