@@ -1017,30 +1017,31 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops,
     const elt = marker.getElement();
     if (elt) elt.classList.toggle("hl-marker", on);
   };
+  const tooltipOpts = { direction: "top", offset: [-16, -16] };
   if (range.startIdx === 0) {
     const start = L.marker(latlng[0])
       .addTo(map)
-      .bindPopup(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`);
+      .bindTooltip(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`, tooltipOpts);
     registerMapPeer("stop", "start", start, iconHighlight(start));
   } else if (startSplitStop != null) {
     // Split stop opening this pane: a Start-like pin showing departure time.
     const c = stops[startSplitStop];
     const pin = L.marker([c.lat, c.lng])
       .addTo(map)
-      .bindPopup(`<b>S${startSplitStop + 1}</b><br>departs ${fmtClock(c.time_after_s)}`);
+      .bindTooltip(`<b>S${startSplitStop + 1}</b><br>departs ${fmtClock(c.time_after_s)}`, tooltipOpts);
     registerMapPeer("stop", `c${startSplitStop}`, pin, iconHighlight(pin));
   }
   if (range.endIdx === last) {
     const end = L.marker(latlng[last])
       .addTo(map)
-      .bindPopup(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`);
+      .bindTooltip(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`, tooltipOpts);
     registerMapPeer("stop", "end", end, iconHighlight(end));
   } else if (endSplitStop != null) {
     // Split stop closing this pane: an End-like pin showing arrival time.
     const c = stops[endSplitStop];
     const pin = L.marker([c.lat, c.lng])
       .addTo(map)
-      .bindPopup(`<b>S${endSplitStop + 1}</b><br>arrives ${fmtClock(c.time_before_s)}`);
+      .bindTooltip(`<b>S${endSplitStop + 1}</b><br>arrives ${fmtClock(c.time_before_s)}`, tooltipOpts);
     registerMapPeer("stop", `c${endSplitStop}`, pin, iconHighlight(pin));
   }
 }
