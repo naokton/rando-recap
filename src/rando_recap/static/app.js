@@ -1414,15 +1414,21 @@ function addFullscreenControl(map, container, bounds) {
 }
 
 // --- analysis view -----------------------------------------------------
-async function renderAnalysis(rideId, minStop, mergeWithinM) {
+// `refresh` is a one-shot: when true we ask the backend to re-fetch this ride's
+// streams from Strava (costs an API call). It is deliberately NOT persisted to
+// user-params and NOT carried in the URL hash — a reload or back-nav must reload
+// from cache, never silently re-spend quota. The refresh button just re-invokes
+// renderAnalysis with it set; the next route() drops back to refresh=false.
+async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
   saveUserParams({ minStop, mergeWithinM });
   // ---------------------
   // Loading
   root.innerHTML = "";
-  root.appendChild(el("div", { class: "empty" }, "Loading…"));
+  root.appendChild(el("div", { class: "empty" }, refresh ? "Refreshing from Strava…" : "Loading…"));
   let data;
   try {
     const qs = new URLSearchParams({ min_stop: minStop, merge_within_m: mergeWithinM });
+    if (refresh) qs.set("refresh", "true");
     data = await fetchJson(`/api/rides/${rideId}/analysis?${qs}`);
   } catch (e) {
     root.innerHTML = "";
@@ -1445,12 +1451,26 @@ async function renderAnalysis(rideId, minStop, mergeWithinM) {
   // ---------------------
   // Title & Info
   const a = data.activity;
+  // Re-fetch this ride's streams from Strava. unmountCurrentView() first so the
+  // current map/listeners are torn down before the re-render replaces the DOM
+  // (route() does this for hash navigations, but this is a direct re-invoke).
+  const refreshBtn = el("button", {
+    class: "icon refresh-btn",
+    type: "button",
+    title: "Refresh GPS data from Strava",
+    "aria-label": "Refresh GPS data from Strava",
+    onclick: () => {
+      unmountCurrentView();
+      renderAnalysis(rideId, minStop, mergeWithinM, true);
+    },
+  });
   root.appendChild(
     el(
       "h2",
       { class: "ride-title" },
       a.name || "(unnamed ride)",
       el("span", { class: "date" }, `(${(a.start_date_local || a.start_date || "").slice(0, 10)})`),
+      refreshBtn,
     ),
   );
 

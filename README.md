@@ -53,7 +53,9 @@ Routes:
 The analysis view shows a route polyline colored by day/night (using sunrise
 / sunset for the ride's location and date), stop markers, and a segment
 timeline. Hovering any peer (table row, timeline bar, map element)
-highlights the others.
+highlights the others. The ⟳ button by the title re-fetches that ride's
+streams from Strava (one API call) — use it if you trimmed or fixed the GPS
+track after it was cached.
 
 UI state lives in the URL hash: `#min_dist=190` on the list, and
 `#ride=<id>&min_stop=5m` on the analysis page — refresh-safe and shareable.

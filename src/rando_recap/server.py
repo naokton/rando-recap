@@ -240,5 +240,9 @@ def analyze_ride(
         raise HTTPException(status_code=422, detail=str(e)) from e
     except StravaScopeError as e:
         raise HTTPException(status_code=403, detail=str(e)) from e
+    except StravaRateLimitError as e:
+        # Reachable once streams are re-fetched live (refresh=true): a daily-limit
+        # hit would otherwise surface as a generic 500.
+        raise HTTPException(status_code=429, detail=str(e)) from e
 
     return build_payload(result)
