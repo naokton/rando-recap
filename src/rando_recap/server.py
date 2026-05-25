@@ -123,7 +123,6 @@ def list_rides(
 @app.post("/api/fetch")
 def fetch_rides(
     since: str = Query("1m"),
-    refresh: bool = Query(False),
 ) -> StreamingResponse:
     """Cache activity summaries in the ``since`` window, streaming progress as SSE.
 
@@ -145,14 +144,14 @@ def fetch_rides(
 
     def stream() -> Iterator[str]:
         global _fetch_running
-        seen = added = skipped = 0
+        seen = added = updated = 0
         try:
-            for p in fetch_summaries(c, after, refresh=refresh):
+            for p in fetch_summaries(c, after):
                 seen += 1
                 if p.action == "add":
                     added += 1
                 else:
-                    skipped += 1
+                    updated += 1
                 yield _sse(
                     {
                         "type": "progress",
@@ -163,7 +162,7 @@ def fetch_rides(
                         "name": p.name,
                     }
                 )
-            yield _sse({"type": "done", "seen": seen, "added": added, "skipped": skipped})
+            yield _sse({"type": "done", "seen": seen, "added": added, "updated": updated})
         except (StravaScopeError, StravaRateLimitError) as e:
             yield _sse({"type": "error", "detail": str(e)})
         except Exception as e:

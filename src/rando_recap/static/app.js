@@ -444,9 +444,9 @@ function renderFetch(since) {
 
   let seen = 0;
   let added = 0;
-  let skipped = 0;
+  let updated = 0;
   const setCounts = (status) => {
-    counts.textContent = `seen ${seen} · added ${added} · skipped ${skipped}${
+    counts.textContent = `seen ${seen} · added ${added} · updated ${updated}${
       status ? ` — ${status}` : ""
     }`;
   };
@@ -468,17 +468,17 @@ function renderFetch(since) {
     onProgress: (ev) => {
       seen += 1;
       if (ev.action === "add") added += 1;
-      else skipped += 1;
+      else updated += 1;
       setCounts("");
       const km = (ev.distance_km ?? 0).toFixed(1).padStart(6);
       appendLine(
         ev.action,
-        `${ev.action.padEnd(7)}${(ev.datetime || "").slice(0, 10)}  ${km} km  ${ev.name || ""}`,
+        `${ev.action.padEnd(8)}${(ev.datetime || "").slice(0, 10)}  ${km} km  ${ev.name || ""}`,
       );
     },
     onDone: (ev) => {
       setCounts("done");
-      appendLine("done", `Done. seen=${ev.seen} added=${ev.added} skipped=${ev.skipped}`);
+      appendLine("done", `Done. seen=${ev.seen} added=${ev.added} updated=${ev.updated}`);
       showBack();
     },
     onError: (detail) => {

@@ -132,8 +132,8 @@ def list_summaries(allowed_types: set[str], min_distance_m: float) -> tuple[int,
 class FetchProgress:
     """One activity processed by :func:`fetch_summaries`.
 
-    ``action`` is ``"add"`` when the summary was newly cached (or overwritten on
-    refresh) or ``"cached"`` when it was already present and left untouched.
+    ``action`` is ``"add"`` when the summary was newly cached or ``"updated"``
+    when it was already present and overwritten with the fresh listing data.
     """
 
     action: str
@@ -146,23 +146,23 @@ class FetchProgress:
 def fetch_summaries(
     sclient: StravaClient,
     after: int | None,
-    *,
-    refresh: bool = False,
 ) -> Iterator[FetchProgress]:
     """Cache every activity summary newer than ``after`` (epoch seconds, None = all).
 
     Yields a :class:`FetchProgress` per activity as it goes so callers can stream
     progress. Filtering by distance/sport_type happens at list time, not here.
     Auth is the caller's job. Raises StravaScopeError / StravaRateLimitError.
+
+    The listing endpoint already returns each activity's full summary, so caching
+    it is free (no extra API call). We therefore always overwrite — keeping the
+    cache faithful to Strava-side edits (renames, type/distance changes) — and use
+    ``action`` only to label new vs refreshed rows for the progress log.
     """
     for activity in sclient.list_athlete_activities(after=after):
         sid = int(activity["id"])
         summary = Summary.from_activity(activity)
-        if not refresh and sclient.cache.has("summary", sid):
-            action = "cached"
-        else:
-            sclient.cache.set("summary", sid, activity)
-            action = "add"
+        action = "updated" if sclient.cache.has("summary", sid) else "add"
+        sclient.cache.set("summary", sid, activity)
         yield FetchProgress(action, sid, summary.datetime, summary.distance_km, summary.name)
 
 

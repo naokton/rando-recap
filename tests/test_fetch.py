@@ -85,19 +85,21 @@ def _activity(sid, name="ride", distance=200_000):
     return {"id": sid, "name": name, "distance": distance, "start_date_local": "2026-05-01T00:00:00Z"}
 
 
-def test_fetch_summaries_adds_new_and_skips_cached():
+def test_fetch_summaries_labels_new_vs_updated():
     client = _FakeClient([_activity(1), _activity(2)], present=[1])
     events = list(fetch_summaries(client, after=12345))
 
     assert client.list_after == 12345
-    assert [(e.action, e.id) for e in events] == [("cached", 1), ("add", 2)]
-    # The new activity was cached; the already-present one left untouched.
-    assert 2 in client.cache._store and client.cache._store[2]["name"] == "ride"
+    # id 1 was already cached -> "updated"; id 2 is new -> "add".
+    assert [(e.action, e.id) for e in events] == [("updated", 1), ("add", 2)]
+    assert client.cache._store[2]["name"] == "ride"
 
 
-def test_fetch_summaries_refresh_recaches_present():
-    client = _FakeClient([_activity(1)], present=[1])
-    events = list(fetch_summaries(client, after=None, refresh=True))
+def test_fetch_summaries_always_overwrites_cached():
+    # The present activity starts as a stale blob ({}); fetch must overwrite it
+    # with the fresh listing data even though it was already cached.
+    client = _FakeClient([_activity(1, name="renamed")], present=[1])
+    events = list(fetch_summaries(client, after=None))
 
-    assert [e.action for e in events] == ["add"]
-    assert client.cache._store[1]["id"] == 1
+    assert [e.action for e in events] == ["updated"]
+    assert client.cache._store[1]["name"] == "renamed"

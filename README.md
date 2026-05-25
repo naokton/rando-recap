@@ -48,7 +48,7 @@ Routes:
 - `/api/rides/{activity_id}/analysis` — JSON analysis. Query: `min_stop`,
   `refresh`.
 - `POST /api/fetch` — cache activity summaries, streaming progress as
-  Server-Sent Events. Query: `since`, `refresh`.
+  Server-Sent Events. Query: `since`.
 
 The analysis view shows a route polyline colored by day/night (using sunrise
 / sunset for the ride's location and date), stop markers, and a segment
@@ -71,9 +71,12 @@ every field the analysis needs; streams are fetched on demand when you open a
 ride.
 
 Pick a window (last week through all-time) and the fetch streams its progress
-live. It's idempotent — already-cached rides are skipped — and respects
-Strava's rate limits (sleeps near the 100-req / 15-minute cap, retries once on
-429, aborts on daily-limit exhaustion).
+live. Summaries are always written, so a re-fetch picks up Strava-side edits
+(renames, type/distance changes) — the progress log labels each ride **add**
+(new) or **updated** (already cached). The listing endpoint returns the full
+summary either way, so this costs no extra API calls. It respects Strava's rate
+limits (sleeps near the 100-req / 15-minute cap, retries once on 429, aborts on
+daily-limit exhaustion).
 
 Filtering by sport type and minimum distance happens at list time, not at fetch
 time, so you can change the threshold without re-fetching.

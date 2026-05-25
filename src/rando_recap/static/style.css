@@ -373,7 +373,7 @@ main {
 .fetch-line {
   white-space: pre;
 }
-.fetch-line.cached {
+.fetch-line.updated {
   color: var(--muted);
 }
 .fetch-line.done {
