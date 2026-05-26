@@ -64,3 +64,7 @@ class Streams:
     @property
     def watts(self) -> list[float] | None:
         return self.series("watts")
+
+    @property
+    def temp(self) -> list[float] | None:
+        return self.series("temp")

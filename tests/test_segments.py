@@ -1,5 +1,5 @@
 from rando_recap.daynight import Stretch, seconds_by_state
-from rando_recap.segments import build_segments, coasting_frac
+from rando_recap.segments import build_segments, coasting_frac, temp_stats
 from rando_recap.stops import Stop
 from rando_recap.streams import Streams
 
@@ -159,6 +159,37 @@ def test_segment_carries_coasting_counts():
     seg = build_segments(s, stops=[])[0]
     assert (seg.coasting_n, seg.coasting_d) == (2, 4)
     assert seg.coasting_n / seg.coasting_d == seg.coasting_frac
+
+
+def test_temp_stats_mean_min_max_count():
+    # Unlike cadence/watts, 0°C is a real reading and is kept; None is ignored.
+    temp = [10, 0, None, -4, 12]
+    avg, lo, hi, n = temp_stats(temp, 0, 4)
+    assert avg == (10 + 0 - 4 + 12) / 4
+    assert (lo, hi, n) == (-4, 12, 4)
+
+
+def test_temp_stats_missing_yields_zeros():
+    assert temp_stats(None, 0, 3) == (None, None, None, 0)
+    assert temp_stats([None, None], 0, 1) == (None, None, None, 0)
+
+
+def test_segment_carries_temperature():
+    s = _streams(
+        time_s=[0, 60, 120, 180],
+        distance=[0.0, 1000.0, 2000.0, 3000.0],
+        temp=[8, 10, 12, 14],
+    )
+    seg = build_segments(s, stops=[])[0]
+    assert seg.avg_temp == (8 + 10 + 12 + 14) / 4
+    assert (seg.temp_min, seg.temp_max, seg.temp_n) == (8, 14, 4)
+
+
+def test_segment_without_temp_stream_is_none():
+    s = _streams(time_s=[0, 60], distance=[0.0, 1000.0])
+    seg = build_segments(s, stops=[])[0]
+    assert seg.avg_temp is None
+    assert (seg.temp_min, seg.temp_max, seg.temp_n) == (None, None, 0)
 
 
 def test_zero_length_segment_skipped():

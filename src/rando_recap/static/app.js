@@ -141,6 +141,14 @@ function fmtKmh(mps, digits = 1) {
 function fmtPct(frac) {
   return frac == null ? "-" : `${Math.round(frac * 100)}%`;
 }
+// "18°C (9–27°C)" — drops the range when min/max round equal or are missing.
+function fmtTempRange(avg, min, max) {
+  if (avg == null) return "-";
+  const a = `${Math.round(avg)}°C`;
+  if (min != null && max != null && Math.round(min) !== Math.round(max))
+    return `${a} (${Math.round(min)}–${Math.round(max)}°C)`;
+  return a;
+}
 
 function makeClockFmt(startIso, utcOffsetS) {
   // start_date is UTC ISO; show clock in the activity's local tz (= utc_offset).
@@ -898,6 +906,7 @@ function renderSegmentsTable(segments) {
         el("th", {}, "HR"),
         el("th", {}, "Cad"),
         el("th", {}, "Power"),
+        el("th", {}, "°C"),
         el("th", {}, "Coast"),
         el("th", {}, "Climb m"),
         el("th", {}, "Climb m/km"),
@@ -917,6 +926,7 @@ function renderSegmentsTable(segments) {
           el("td", {}, fmtNum(s.avg_hr)),
           el("td", {}, fmtNum(s.avg_cadence)),
           el("td", {}, fmtNum(s.avg_watts)),
+          el("td", {}, fmtNum(s.avg_temp)),
           el("td", {}, fmtPct(s.coasting_frac)),
           el("td", {}, fmtNum(s.climb_m)),
           el("td", {}, fmtNum(s.climb_m_per_km, 1)),
@@ -1243,6 +1253,14 @@ function paneSummary(segs, elapsedS) {
   const movingS = sum((s) => s.moving_s);
   const coastD = sum((s) => s.coasting_d);
   const coastFrac = coastD ? sum((s) => s.coasting_n) / coastD : null;
+  // Temperature has no whole-pane aggregate, so pool it from segments: a
+  // sample-count-weighted mean, and the extremes across each segment's range.
+  const tempN = sum((s) => s.temp_n);
+  const tempAvg = tempN ? sum((s) => (s.avg_temp || 0) * s.temp_n) / tempN : null;
+  const tempMins = segs.map((s) => s.temp_min).filter((v) => v != null);
+  const tempMaxs = segs.map((s) => s.temp_max).filter((v) => v != null);
+  const tempMin = tempMins.length ? Math.min(...tempMins) : null;
+  const tempMax = tempMaxs.length ? Math.max(...tempMaxs) : null;
   return el(
     "div",
     { class: "pane-summary" },
@@ -1252,6 +1270,7 @@ function paneSummary(segs, elapsedS) {
     summaryItem("Elapsed", fmtDur(elapsedS)),
     summaryItem("Moving", fmtDur(movingS)),
     summaryItem("Rest", fmtDur(Math.max(0, elapsedS - movingS))),
+    summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
     el(
       "div",
       { class: "pane-dn" },
@@ -1648,6 +1667,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
         ),
       ),
       summaryItem("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s)),
+      summaryItem("Temp", fmtTempRange(a.temp_avg_c, a.temp_min_c, a.temp_max_c)),
     ),
   );
 

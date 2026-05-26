@@ -63,6 +63,14 @@ def _fmt_pct(frac: float | None) -> str:
     return "-" if frac is None else f"{frac * 100:.0f}%"
 
 
+def _fmt_temp_range(avg: float | None, lo: float | None, hi: float | None) -> str:
+    if avg is None:
+        return "-"
+    if lo is not None and hi is not None and round(lo) != round(hi):
+        return f"{avg:.0f}°C ({lo:.0f}–{hi:.0f}°C)"  # noqa: RUF001 (en dash range separator)
+    return f"{avg:.0f}°C"
+
+
 def _stop_lines(
     label: str,
     cumulative_km: float,
@@ -232,6 +240,7 @@ def render_terminal(
     stops: list[Stop],
     segments: list[Segment],
     coasting_frac: float | None = None,
+    temp_c: tuple[float | None, float | None, float | None] | None = None,
 ) -> None:
     console = Console()
     start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
@@ -249,12 +258,17 @@ def render_terminal(
         )
     )
     coast = "" if coasting_frac is None else f"   Coast: [bold]{_fmt_pct(coasting_frac)}[/bold]"
+    temp = ""
+    if temp_c is not None:
+        temp_str = _fmt_temp_range(*temp_c)
+        if temp_str != "-":
+            temp = f"   Temp: [bold]{temp_str}[/bold]"
     console.print(
         Padding(
             f"Distance: [bold]{dist_km:.1f} km[/bold]   "
             f"Elapsed: [bold]{_fmt_dur(elapsed)}[/bold]   "
             f"Moving: [bold]{_fmt_dur(moving)}[/bold]   "
-            f"Climb: [bold]{climb:.0f} m[/bold]{coast}",
+            f"Climb: [bold]{climb:.0f} m[/bold]{coast}{temp}",
             _PAD,
         )
     )
@@ -289,6 +303,7 @@ def render_terminal(
     st.add_column("Avg HR", justify="right")
     st.add_column("Avg Cad", justify="right")
     st.add_column("Avg W", justify="right")
+    st.add_column("Avg °C", justify="right")
     st.add_column("Coast %", justify="right")
     st.add_column("Climb (m)", justify="right")
     st.add_column("m/km", justify="right")
@@ -301,6 +316,7 @@ def render_terminal(
             _fmt_num(s.avg_hr, 0),
             _fmt_num(s.avg_cadence, 0),
             _fmt_num(s.avg_watts, 0),
+            _fmt_num(s.avg_temp, 0),
             _fmt_pct(s.coasting_frac),
             _fmt_num(s.climb_m, 0),
             _fmt_num(s.climb_m_per_km, 1),

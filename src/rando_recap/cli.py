@@ -91,7 +91,13 @@ def analyze(
         sys.stdout.write(render_json(result))
         sys.stdout.write("\n")
     else:
-        render_terminal(result.activity, result.stops, result.segments, result.coasting_frac)
+        render_terminal(
+            result.activity,
+            result.stops,
+            result.segments,
+            result.coasting_frac,
+            (result.temp_avg_c, result.temp_min_c, result.temp_max_c),
+        )
 
 
 @main.command(name="list")

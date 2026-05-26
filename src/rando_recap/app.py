@@ -15,7 +15,7 @@ from platformdirs import user_cache_dir, user_config_dir
 
 from .cache import Cache
 from .daynight import State, Stretch, build_stretches, seconds_by_state
-from .segments import Segment, build_segments, coasting_frac
+from .segments import Segment, build_segments, coasting_frac, temp_stats
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
 from .streams import MissingStreamsError, Streams
@@ -175,6 +175,9 @@ class AnalysisResult:
     daynight: list[Stretch]
     daynight_seconds: dict[State, int]
     coasting_frac: float | None
+    temp_avg_c: float | None
+    temp_min_c: float | None
+    temp_max_c: float | None
 
 
 class ActivityNotCachedError(LookupError):
@@ -208,7 +211,20 @@ def _analyze_core(
     daynight_seconds = seconds_by_state(streams.time, daynight)
     cadence = streams.cadence
     ride_coasting = coasting_frac(cadence, 0, len(cadence) - 1) if cadence else None
-    return AnalysisResult(activity, streams, stops, segments, daynight, daynight_seconds, ride_coasting)
+    temp = streams.temp
+    temp_avg, temp_min, temp_max, _ = temp_stats(temp, 0, len(temp) - 1) if temp else (None, None, None, 0)
+    return AnalysisResult(
+        activity,
+        streams,
+        stops,
+        segments,
+        daynight,
+        daynight_seconds,
+        ride_coasting,
+        temp_avg,
+        temp_min,
+        temp_max,
+    )
 
 
 def analyze_activity(
@@ -235,7 +251,7 @@ def analyze_activity(
 
 COMBINED_ID_PREFIX = "combined:"
 
-_PASSTHROUGH_STREAM_KEYS = ("latlng", "altitude", "heartrate", "cadence", "watts")
+_PASSTHROUGH_STREAM_KEYS = ("latlng", "altitude", "heartrate", "cadence", "watts", "temp")
 
 
 def combine_activities(

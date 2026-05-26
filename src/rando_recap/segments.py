@@ -30,6 +30,11 @@ class Segment:
     avg_hr: float | None
     avg_cadence: float | None
     avg_watts: float | None
+    avg_temp: float | None
+    temp_min: float | None
+    temp_max: float | None
+    temp_n: int
+    """Temperature mean/min/max and the present-sample count (for pooling across segments)."""
     climb_m: float
     climb_m_per_km: float | None
     coasting_frac: float | None
@@ -58,6 +63,23 @@ def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = Fals
     if not nums:
         return None
     return sum(nums) / len(nums)
+
+
+def temp_stats(
+    temp: list | None, lo: int, hi: int
+) -> tuple[float | None, float | None, float | None, int]:
+    """(mean, min, max, count) of present temperature samples in ``[lo, hi]``.
+
+    All-None / missing → ``(None, None, None, 0)``. Unlike cadence/watts, 0°C is a
+    real reading, so no value is skipped. The count lets callers pool a weighted
+    mean across segments without re-touching the raw stream.
+    """
+    if temp is None:
+        return None, None, None, 0
+    nums = [v for v in temp[lo : hi + 1] if v is not None]
+    if not nums:
+        return None, None, None, 0
+    return sum(nums) / len(nums), min(nums), max(nums), len(nums)
 
 
 def coasting_frac(cadence: list | None, lo: int, hi: int) -> float | None:
@@ -128,6 +150,7 @@ def build_segments(
     hr = streams.heartrate
     cad = streams.cadence
     watts = streams.watts
+    temp = streams.temp
 
     n = len(time_s)
     if n == 0:
@@ -157,6 +180,7 @@ def build_segments(
         climb_per_km = climb / (dist_m / 1000.0) if dist_m > 0 else None
         state_s = seconds_by_state_range(time_s, stretches, lo, hi, threshold)
         coasting_n, coasting_d = _coasting_counts(cad, lo, hi)
+        avg_temp, temp_min, temp_max, temp_n = temp_stats(temp, lo, hi)
         segments.append(
             Segment(
                 label=label,
@@ -168,6 +192,10 @@ def build_segments(
                 avg_hr=_slice_mean(hr, lo, hi),
                 avg_cadence=_slice_mean(cad, lo, hi, skip_zero=True),
                 avg_watts=_slice_mean(watts, lo, hi, skip_zero=True),
+                avg_temp=avg_temp,
+                temp_min=temp_min,
+                temp_max=temp_max,
+                temp_n=temp_n,
                 climb_m=climb,
                 climb_m_per_km=climb_per_km,
                 coasting_frac=coasting_frac(cad, lo, hi),
