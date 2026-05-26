@@ -40,7 +40,7 @@ uv run app serve --reload              # dev: auto-reload on code change
 ```
 
 The landing page lists your cached rides, filtered by sport type and a minimum
-distance. **Fetch rides** pulls activity summaries (see below), and **Merge
+distance. **Fetch rides** pulls activity summaries (see below), and **Stitch
 rides** opens two or more selected rides as one combined analysis (see below).
 Click any ride to open its analysis view: a map, a timeline, and tables of
 stops and segments.
@@ -55,8 +55,9 @@ streams from Strava (one API call) — use it if you trimmed or fixed the GPS
 track after it was cached.
 
 Multi-day brevets often upload to Strava as separate per-day activities. Click
-**Merge rides**, select two or more, and **Open** to analyze them as one
-synthetic ride. The parts are stitched in start-time order; the gaps between
+**Stitch rides**, select two or more, and **Open** to analyze them as one
+synthetic ride — your activities stay separate; this only composes a view. The
+parts are stitched in start-time order; the gaps between
 them (overnight sleep, etc.) survive as real gaps in the time stream, so they
 show up as stops just like any other.
 

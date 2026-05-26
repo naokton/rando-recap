@@ -559,11 +559,18 @@ async function renderList(minDist) {
               renderTable();
             },
           },
-          "Merge rides",
+          "Stitch rides",
         ),
       );
       return;
     }
+    mergeControls.appendChild(
+      el(
+        "span",
+        { class: "merge-hint" },
+        "Stitch selected rides into one view. Your activity data stay separate.",
+      ),
+    );
     const openBtn = el(
       "button",
       {
