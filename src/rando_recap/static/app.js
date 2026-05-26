@@ -90,8 +90,34 @@ const DAYNIGHT_COLORS = {
 };
 
 const MIN_MAP_HEIGHT_PX = 200;
-const STOP_MARKER_MIN_R = 3;
-const STOP_MARKER_MAX_R = 40;
+// Stop marker radius (px) by *absolute* rest duration, so a given rest length
+// looks the same size across rides. [rest_seconds, radius] anchors are
+// interpolated linearly; the last anchor (6h→40px) is the max, and anything
+// longer caps at 40px.
+const STOP_MARKER_ANCHORS = [
+  [0, 6], // very short rests (a few seconds): minimum size
+  [1800, 15], // 30 minutes
+  [3600, 25], // 1 hour
+  [21600, 40], // 6 hours
+];
+const STOP_MARKER_MAX_R = 40; // cap for very long rests
+
+function stopMarkerRadius(restS) {
+  const s = Math.max(0, restS || 0);
+  const a = STOP_MARKER_ANCHORS;
+  for (let k = 1; k < a.length; k++) {
+    if (s <= a[k][0]) {
+      const [s0, r0] = a[k - 1];
+      const [s1, r1] = a[k];
+      return r0 + ((r1 - r0) * (s - s0)) / (s1 - s0);
+    }
+  }
+  // Beyond the last anchor: keep the final segment's slope, capped at the max.
+  const [s0, r0] = a[a.length - 2];
+  const [s1, r1] = a[a.length - 1];
+  const slope = (r1 - r0) / (s1 - s0);
+  return Math.min(STOP_MARKER_MAX_R, r1 + slope * (s - s1));
+}
 
 function fmtDur(seconds) {
   if (seconds == null) return "-";
@@ -1077,24 +1103,11 @@ function drawStopMarkers(map, stops, range, onClickStop, startSplitStop, endSpli
       return c.index_before >= range.startIdx && c.index_before <= range.endIdx;
     });
   if (!visible.length) return null;
-  // Radius normalization uses the global maxRest so marker sizes are
-  // comparable across the two split maps, not just within a half.
-  const maxRest = Math.max(1, ...stops.map((c) => c.rest_s || 0));
   // Render largest circles first so smaller ones land on top — when stops
   // cluster at the same place, the smaller circle stays hoverable instead of
   // being buried under the larger one.
   const ordered = visible
-    .map(({ c, i }) => ({
-      c,
-      i,
-      // Radius scales with sqrt(rest_s / maxRest) so circle *area* is roughly
-      // proportional to rest time. Normalizing to maxRest keeps the longest
-      // rest at the max radius (so it always fits on the map) while preserving
-      // relative size differences between shorter rests.
-      radius:
-        STOP_MARKER_MIN_R +
-        (STOP_MARKER_MAX_R - STOP_MARKER_MIN_R) * Math.sqrt((c.rest_s || 0) / maxRest),
-    }))
+    .map(({ c, i }) => ({ c, i, radius: stopMarkerRadius(c.rest_s) }))
     .sort((a, b) => b.radius - a.radius);
   const markers = ordered.map(({ c, i, radius }) => {
     const marker = L.circleMarker([c.lat, c.lng], {
