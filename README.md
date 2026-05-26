@@ -1,13 +1,13 @@
 # Rando Recap
 
-Per-stop and per-segment analysis of randonneuring rides, from Strava
-activity streams. Stops are auto-detected from gaps in the recording (your
-Garmin pauses at stops, leaving gaps in the time stream).
+Ride recap for randonneurs: finds where and how long you stopped, splits the
+route into segments between stops, and reports day/twilight/night riding time
+and per-segment statistics. Stops are auto-detected from gaps in the recording.
+Ride data comes from Strava activity streams.
 
 Runs as a local web app: a FastAPI server with a Leaflet-based single-page UI
-that renders a map, timeline, and per-stop / per-segment tables, with
-linked hover across all three. The same analysis is also available from the
-CLI.
+that renders a map, timeline, and tables of stops and segments, with
+linked hover across all of them.
 
 ![Screenshot](imgs/image.jpg)
 
@@ -39,23 +39,17 @@ uv run app serve --host 0.0.0.0 --port 8080
 uv run app serve --reload              # dev: auto-reload on code change
 ```
 
-Routes:
+The landing page lists your cached rides, filtered by sport type and a minimum
+distance. **Fetch rides** pulls activity summaries (see below), and **Merge
+rides** opens two or more selected rides as one combined analysis (see below).
+Click any ride to open its analysis view: a map, a timeline, and tables of
+stops and segments.
 
-- `/` — ride list (filtered by minimum distance). Click a ride for the
-  analysis view: map, timeline, stops table, segments table. The **Fetch
-  rides** button pulls activity summaries from Strava (see below). The **Merge
-  rides** button selects two or more rides and opens them as one combined
-  analysis (see below).
-- `/api/rides` — JSON list of cached rides. Query: `min_distance_km`, `types`.
-- `/api/rides/{activity_id}/analysis` — JSON analysis. `activity_id` is an
-  integer, or `combined:<id>,<id>,…` to stitch several uploads into one ride.
-  Query: `min_stop`, `merge_within_m`, `refresh`.
-- `POST /api/fetch` — cache activity summaries, streaming progress as
-  Server-Sent Events. Query: `since`.
-
-The analysis view shows a route polyline colored by day/night (using sunrise
-/ sunset for the ride's location and date), stop markers, and a segment
-timeline. Hovering any peer (table row, timeline bar, map element)
+The analysis view classifies every point as day, twilight, or night (from
+sunrise / sunset for the ride's location and date) and breaks down the time
+each segment spends in each. The route polyline is colored by that
+classification, alongside
+stop markers and a segment timeline. Hovering any peer (table row, timeline bar, map element)
 highlights the others. The ⟳ button by the title re-fetches that ride's
 streams from Strava (one API call) — use it if you trimmed or fixed the GPS
 track after it was cached.
@@ -68,7 +62,7 @@ show up as stops just like any other.
 
 The server is single-user with no auth; bind to `127.0.0.1` unless you know
 what you're doing. On first run the list is empty — click **Fetch rides** to
-populate the local cache (see below).
+populate the local cache.
 
 ### Fetch rides
 
@@ -121,7 +115,7 @@ uv run app list --min-distance 200 --types Ride
 
 API responses are cached at `~/Library/Caches/rando-recap/cache.db`
 (macOS) so re-runs and threshold tweaks don't re-hit Strava. Pass
-`--refresh` (CLI) or `?refresh=true` (HTTP API) to force a fetch.
+`--refresh` on the CLI, or use the ⟳ button in the web app, to force a fetch.
 
 ## Development
 
