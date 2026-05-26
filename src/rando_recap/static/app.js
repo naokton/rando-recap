@@ -1008,7 +1008,22 @@ function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
   return lines;
 }
 
-function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops, startSplitStop, endSplitStop) {
+// A teardrop pin: "start" role (start / split departure) labeled
+// S, "end" role (end / split arrival) labeled E. The tip is anchored to the
+// geographic point; tooltipAnchor lifts hover tooltips clear of the head. CSS
+// lives in style.css (.map-pin).
+function pinIcon(role) {
+  const label = role === "start" ? "S" : "E";
+  return L.divIcon({
+    className: "",
+    html: `<div class="map-pin map-pin--${role}"><div class="map-pin__head"><span class="map-pin__label">${label}</span></div></div>`,
+    iconSize: [28, 38],
+    iconAnchor: [14, 36],
+    tooltipAnchor: [0, -34],
+  });
+}
+
+function drawEndpointMarkers(map, latlng, range, fmtClock, endS, stops, startSplitStop, endSplitStop) {
   // Each pane gets a pin at both ends. The outer ends use the ride's global
   // Start/End when the range reaches the track ends; otherwise the border is a
   // split stop, drawn as a pin on both panes it divides.
@@ -1017,29 +1032,29 @@ function drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops,
     const elt = marker.getElement();
     if (elt) elt.classList.toggle("hl-marker", on);
   };
-  const tooltipOpts = { direction: "top", offset: [-16, -16] };
+  const tooltipOpts = { direction: "top" };
   if (range.startIdx === 0) {
-    const start = L.marker(latlng[0])
+    const start = L.marker(latlng[0], { icon: pinIcon("start") })
       .addTo(map)
-      .bindTooltip(`<b>Start</b><br>0.0 km<br>${fmtClock(0)}`, tooltipOpts);
+      .bindTooltip(`<b>Start</b><br>departs ${fmtClock(0)}`, tooltipOpts);
     registerMapPeer("stop", "start", start, iconHighlight(start));
   } else if (startSplitStop != null) {
     // Split stop opening this pane: a Start-like pin showing departure time.
     const c = stops[startSplitStop];
-    const pin = L.marker([c.lat, c.lng])
+    const pin = L.marker([c.lat, c.lng], { icon: pinIcon("start") })
       .addTo(map)
       .bindTooltip(`<b>S${startSplitStop + 1}</b><br>departs ${fmtClock(c.time_after_s)}`, tooltipOpts);
     registerMapPeer("stop", `c${startSplitStop}`, pin, iconHighlight(pin));
   }
   if (range.endIdx === last) {
-    const end = L.marker(latlng[last])
+    const end = L.marker(latlng[last], { icon: pinIcon("end") })
       .addTo(map)
-      .bindTooltip(`<b>End</b><br>${totalKm} km<br>${fmtClock(endS)}`, tooltipOpts);
+      .bindTooltip(`<b>End</b><br>arrives ${fmtClock(endS)}`, tooltipOpts);
     registerMapPeer("stop", "end", end, iconHighlight(end));
   } else if (endSplitStop != null) {
     // Split stop closing this pane: an End-like pin showing arrival time.
     const c = stops[endSplitStop];
-    const pin = L.marker([c.lat, c.lng])
+    const pin = L.marker([c.lat, c.lng], { icon: pinIcon("end") })
       .addTo(map)
       .bindTooltip(`<b>S${endSplitStop + 1}</b><br>arrives ${fmtClock(c.time_before_s)}`, tooltipOpts);
     registerMapPeer("stop", `c${endSplitStop}`, pin, iconHighlight(pin));
@@ -1141,12 +1156,11 @@ function renderMap(container, data, model, range, ctx) {
   }).addTo(map);
 
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
-  const { cumKm, endS } = model;
-  const totalKm = cumKm[cumKm.length - 1].toFixed(1);
+  const { endS } = model;
 
   const hasDaynight = drawDaynightPath(map, latlng, daynight, range);
   const segLines = drawSegmentLines(map, latlng, segments, hasDaynight, range);
-  drawEndpointMarkers(map, latlng, range, fmtClock, totalKm, endS, stops, ctx.startSplitStop, ctx.endSplitStop);
+  drawEndpointMarkers(map, latlng, range, fmtClock, endS, stops, ctx.startSplitStop, ctx.endSplitStop);
   const stopsLayer = drawStopMarkers(map, stops, range, ctx.onClickStop, ctx.startSplitStop, ctx.endSplitStop);
   if (hasDaynight) addMapLegend(map, !!stopsLayer);
 

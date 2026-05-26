@@ -18,6 +18,8 @@
   --stop: #dc2626;
   --twilight: #1c8bc4;
   --night: #033b73;
+  --pin-start: #4a72a8;
+  --pin-end: #b55b56;
 }
 * {
   box-sizing: border-box;
@@ -876,4 +878,46 @@ table.data tr.row.hl:hover {
 }
 .leaflet-marker-icon.hl-marker {
   filter: drop-shadow(0 0 4px var(--accent)) brightness(1.05);
+}
+/* Endpoint pins (divIcon) */
+.map-pin {
+  position: relative;
+  width: 28px;
+  height: 38px;
+}
+.map-pin--start {
+  color: var(--pin-start);
+}
+.map-pin--end {
+  color: var(--pin-end);
+}
+.map-pin__head {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.map-pin__head::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 10px solid currentColor;
+}
+.map-pin__label {
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  line-height: 1;
 }
