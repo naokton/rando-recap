@@ -1335,13 +1335,42 @@ function paneSummary(segs, elapsedS) {
 
 function buildMapArea(mapWrap, summaryWrap, data, model) {
   let splits = []; // sorted ascending stop indices; [] = single-map mode
-  let maps = [];
+  // One entry per rendered pane: its Leaflet map, the stream-index range it
+  // covers, and a lazily-created hover marker (the dot synced to the chart).
+  let panesRendered = [];
 
   const teardown = () => {
     closeMarkerMenu();
-    for (const m of maps) m.remove();
-    maps = [];
+    for (const p of panesRendered) p.map.remove();
+    panesRendered = [];
     clearMapPeers();
+  };
+
+  // Show a small circle on the route at stream index `idx` (null hides it),
+  // driven by the chart's crosshair. The marker lands on whichever pane owns
+  // that index; other panes hide theirs.
+  const setHoverIndex = (idx) => {
+    const ll = idx == null ? null : data.latlng[idx];
+    for (const p of panesRendered) {
+      const inRange = ll && idx >= p.range.startIdx && idx <= p.range.endIdx;
+      if (inRange) {
+        if (!p.hoverMarker) {
+          p.hoverMarker = L.circleMarker(ll, {
+            radius: 5,
+            color: "white",
+            weight: 2,
+            fillColor: SEGMENT_HOVER_COLOR,
+            fillOpacity: 1,
+            interactive: false,
+          }).addTo(p.map);
+        } else {
+          p.hoverMarker.setLatLng(ll);
+        }
+      } else if (p.hoverMarker) {
+        p.hoverMarker.remove();
+        p.hoverMarker = null;
+      }
+    }
   };
 
   // Clicking "Split here" on a stop marker adds a split at that stop,
@@ -1445,13 +1474,13 @@ function buildMapArea(mapWrap, summaryWrap, data, model) {
     setTimeout(() => {
       panes.forEach((p, i) => {
         const m = renderMap(inners[i], data, model, p.range, p.ctx);
-        if (m) maps.push(m);
+        if (m) panesRendered.push({ map: m, range: p.range, hoverMarker: null });
       });
     }, 0);
   };
 
   render();
-  return { destroy: teardown, toggleSplit };
+  return { destroy: teardown, toggleSplit, setHoverIndex };
 }
 
 // --- map controls ------------------------------------------------------
@@ -1649,7 +1678,7 @@ function niceTicks(min, max, count = 4) {
 // lengthens so labels never crowd.
 const CHART_X_STEPS = [300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800];
 
-function buildChart(data, model) {
+function buildChart(data, model, onHoverIndex = () => {}) {
   const series = data.series;
   if (!series || !Array.isArray(series.time) || series.time.length < 2) return null;
   const { activity, stops, segments } = data;
@@ -1732,6 +1761,17 @@ function buildChart(data, model) {
     hoverKind = key == null ? null : kind;
     hoverKey = key;
     if (kind && key != null) setHover(kind, key);
+  };
+
+  // Drive the synced map dot, mirroring setChartHover's early-return guard so a
+  // rest-band sweep (every mousemove there yields null) or any repeated
+  // identical event collapses to a single dispatch instead of re-running the
+  // per-pane marker update each time.
+  let lastHoverIdx;
+  const emitHoverIndex = (idx) => {
+    if (idx === lastHoverIdx) return;
+    lastHoverIdx = idx;
+    onHoverIndex(idx);
   };
 
   // The scaled series and its y-extent depend only on the chosen metric, not on
@@ -1887,7 +1927,7 @@ function buildChart(data, model) {
 
     // Crosshair (vertical line + dot), shown on hover.
     const cross = svgNode("line", { class: "chart-crosshair", y1: top, y2: top + innerH });
-    const dot = svgNode("circle", { class: "chart-dot", r: 3 });
+    const dot = svgNode("circle", { class: "chart-dot", r: 5 });
     cross.style.display = "none";
     dot.style.display = "none";
     root.appendChild(cross);
@@ -1914,6 +1954,7 @@ function buildChart(data, model) {
 
       const restHit = hit && hit.kind === "stop" ? hit : null;
       let label;
+      let hoverIdx = null;
       if (restHit) {
         const k = parseInt(restHit.key.slice(1), 10);
         dot.style.display = "none";
@@ -1928,9 +1969,11 @@ function buildChart(data, model) {
           dot.style.display = "";
           dot.setAttribute("cx", xScale(time[idx]));
           dot.setAttribute("cy", yScale(v));
+          hoverIdx = idx;
           label = `${fmtClock(time[idx])} · ${v.toFixed(current.digits)} ${current.unit}`;
         }
       }
+      emitHoverIndex(hoverIdx);
       tooltip.textContent = label;
       tooltip.classList.remove("hidden");
       // Clamp the tooltip within the plot, flipping left of the cursor near the
@@ -1945,6 +1988,7 @@ function buildChart(data, model) {
       cross.style.display = "none";
       dot.style.display = "none";
       tooltip.classList.add("hidden");
+      emitHoverIndex(null);
       setChartHover(null, null);
     });
     root.appendChild(overlay);
@@ -1962,6 +2006,7 @@ function buildChart(data, model) {
     el: container,
     destroy: () => {
       ro.disconnect();
+      emitHoverIndex(null);
       setChartHover(null, null);
     },
   };
@@ -2106,7 +2151,7 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
 
   // ---------------------
   // Chart — full-width, directly below the map; whole-ride regardless of splits.
-  chart = buildChart(data, model);
+  chart = buildChart(data, model, (idx) => mapArea && mapArea.setHoverIndex(idx));
   if (chart) root.appendChild(chart.el);
 
   // ---------------------

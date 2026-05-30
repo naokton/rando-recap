@@ -872,6 +872,8 @@ body.map-fullscreen-active {
 }
 .chart-dot {
   fill: var(--segment-hover);
+  stroke: white;
+  stroke-width: 2;
   pointer-events: none;
 }
 .chart-overlay {
