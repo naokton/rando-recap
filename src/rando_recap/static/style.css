@@ -804,6 +804,94 @@ body.map-fullscreen-active {
   border: 1px solid;
   margin: 0 3px;
 }
+/* Chart: full-width metric-vs-time plot below the map. */
+.chart {
+  margin-top: 16px;
+}
+.chart-metrics {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.chart-plot {
+  position: relative;
+  width: 100%;
+}
+.chart-svg {
+  display: block;
+  width: 100%;
+}
+/* Day/twilight/night ribbon below the plot, drawn in solid lighting colors. */
+.chart-ribbon {
+  pointer-events: none;
+}
+/* Rest spans: faint stop-colored fill, brighter when their stop is hovered. */
+.chart-rest {
+  fill: var(--stop);
+  fill-opacity: 0.12;
+  pointer-events: none;
+}
+.chart-rest.hl {
+  fill-opacity: 0.35;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--segment);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.chart-line.hl {
+  stroke: var(--segment-hover);
+  stroke-width: 3;
+}
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.chart-axis {
+  stroke: var(--muted);
+  stroke-width: 1;
+}
+.chart-axis-label {
+  fill: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-unit {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.chart-crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  pointer-events: none;
+}
+.chart-dot {
+  fill: var(--segment-hover);
+  pointer-events: none;
+}
+.chart-overlay {
+  fill: transparent;
+  cursor: crosshair;
+}
+.chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  padding: 3px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .marker-menu {
   position: fixed;
   z-index: 10001;

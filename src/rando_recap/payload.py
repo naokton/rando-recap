@@ -41,7 +41,23 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
         "daynight": [asdict(s) for s in result.daynight],
     }
     if include_latlng:
-        payload["latlng"] = result.streams.latlng
+        s = result.streams
+        payload["latlng"] = s.latlng
+        # Continuous day/twilight/night bands (elapsed seconds) for the chart
+        # ribbon — correct across rests, unlike the index-based `daynight`.
+        payload["lighting"] = [asdict(b) for b in result.lighting]
+        # Per-point series the web chart plots against wall-clock time. `time`
+        # carries the recording gaps (rests) as large deltas, which the chart
+        # renders as breaks/bands. Speed is Strava's smoothed velocity (m/s);
+        # the frontend converts to km/h. Absent streams come back as null and
+        # the chart simply hides that metric's toggle.
+        payload["series"] = {
+            "time": s.time,
+            "elevation": s.altitude,
+            "temperature": s.temp,
+            "power": s.watts,
+            "speed": s.series("velocity_smooth"),
+        }
     return payload
 
 

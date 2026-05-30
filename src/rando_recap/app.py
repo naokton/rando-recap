@@ -14,7 +14,14 @@ from dotenv import load_dotenv
 from platformdirs import user_cache_dir, user_config_dir
 
 from .cache import Cache
-from .daynight import State, Stretch, build_stretches, seconds_by_state
+from .daynight import (
+    LightingBand,
+    State,
+    Stretch,
+    build_stretches,
+    lighting_bands,
+    seconds_by_state,
+)
 from .segments import Segment, build_segments, coasting_frac, temp_stats
 from .stops import Stop, detect_stops, merge_nearby_stops
 from .strava import StravaClient
@@ -173,6 +180,7 @@ class AnalysisResult:
     stops: list[Stop]
     segments: list[Segment]
     daynight: list[Stretch]
+    lighting: list[LightingBand]
     daynight_seconds: dict[State, int]
     coasting_frac: float | None
     temp_avg_c: float | None
@@ -202,11 +210,10 @@ def _analyze_core(
         distance_m=streams.distance,
         merge_within_m=merge_within_m,
     )
-    daynight = build_stretches(
-        streams,
-        activity_start_iso=activity.get("start_date") or activity.get("start_date_local") or "",
-        utc_offset_s=int(activity.get("utc_offset") or 0),
-    )
+    start_iso = activity.get("start_date") or activity.get("start_date_local") or ""
+    utc_offset_s = int(activity.get("utc_offset") or 0)
+    daynight = build_stretches(streams, activity_start_iso=start_iso, utc_offset_s=utc_offset_s)
+    lighting = lighting_bands(streams, activity_start_iso=start_iso, utc_offset_s=utc_offset_s)
     segments = build_segments(streams, stops, daynight)
     daynight_seconds = seconds_by_state(streams.time, daynight)
     cadence = streams.cadence
@@ -219,6 +226,7 @@ def _analyze_core(
         stops,
         segments,
         daynight,
+        lighting,
         daynight_seconds,
         ride_coasting,
         temp_avg,

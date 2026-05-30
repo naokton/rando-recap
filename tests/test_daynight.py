@@ -4,7 +4,7 @@ from itertools import pairwise
 from astral import Observer
 from astral.sun import sun
 
-from rando_recap.daynight import build_stretches
+from rando_recap.daynight import build_stretches, lighting_bands
 from rando_recap.streams import Streams
 
 
@@ -74,6 +74,41 @@ def test_stretches_are_ordered_and_share_boundary_indices():
     assert states[-1] == "night"
     for a, b in pairwise(stretches):
         assert a.index_end == b.index_start
+
+
+def test_lighting_bands_cover_the_whole_span_contiguously():
+    # Two SF samples nine hours apart (06:00 → 15:00 local) with nothing in
+    # between: the per-sample stretches miss the morning twilight, but the
+    # time-based bands must still tile [0, end] with no gaps or overlaps.
+    utc_offset_s = -7 * 3600
+    time_s = [0, 9 * 3600]
+    latlng = [[37.7749, -122.4194]] * 2
+    bands = lighting_bands(_streams(time_s, latlng), "2024-08-10T13:00:00Z", utc_offset_s)
+
+    assert bands[0].start_s == 0
+    assert bands[-1].end_s == time_s[-1]
+    for a, b in pairwise(bands):
+        assert a.end_s == b.start_s  # contiguous
+        assert a.state != b.state  # merged: no two adjacent same-state bands
+
+
+def test_lighting_shows_twilight_hidden_inside_a_rest():
+    # Ride a daytime hour, then a 12-hour rest (one sample before, one after),
+    # resuming pre-dawn. The evening twilight (sunset → dusk) falls entirely in
+    # the rest with no sample to classify, so build_stretches misses it; the
+    # time-based bands must still surface it.
+    utc_offset_s = -7 * 3600
+    # 16:00 local (day), then resume 04:00 next day (night, pre-dawn).
+    time_s = [0, 3600, 3600 + 12 * 3600]
+    latlng = [[37.7749, -122.4194]] * 3
+    start_iso = "2024-08-10T23:00:00Z"  # 16:00 PDT
+
+    sampled = {s.state for s in build_stretches(_streams(time_s, latlng), start_iso, utc_offset_s)}
+    assert "twilight" not in sampled  # the gap swallowed the only twilight
+
+    states = {b.state for b in lighting_bands(_streams(time_s, latlng), start_iso, utc_offset_s)}
+    assert "twilight" in states
+    assert "night" in states
 
 
 def test_multi_day_uses_per_day_sun_times():
