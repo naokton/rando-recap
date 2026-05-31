@@ -539,7 +539,6 @@ table.rides.merge-mode tbody tr.selected:hover {
   justify-content: center;
   gap: 4px;
   min-width: 2px;
-  padding: 0 4px;
   overflow: hidden;
   white-space: nowrap;
   /* Default text/glyph color for the dark moving segments; rest overrides it. */
