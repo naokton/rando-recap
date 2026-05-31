@@ -1289,30 +1289,38 @@ function summaryItem(label, value) {
 
 // Horizontal stacked bar visualizing how the whole ride's Elapsed time divides
 // into moving (day/twilight/night) and rest — the four parts sum to Elapsed.
-// Segment widths are proportional (flex-grow); each carries a tooltip with its
-// duration and share. Returns null when there's nothing to plot.
+// Segment widths are proportional (flex-grow); each shows its day/night glyph
+// (reusing the `dn-*` icons) and share inline, clipped on segments too narrow
+// to fit, with a tooltip carrying the label and exact duration.
 function summaryBar(a) {
   const rest = Math.max(0, a.elapsed_time_s - a.moving_time_s);
   const parts = [
-    ["day", "Day", a.moving_day_time_s || 0],
-    ["twilight", "Twilight", a.moving_twilight_time_s || 0],
-    ["night", "Night", a.moving_night_time_s || 0],
-    ["rest", "Rest", rest],
+    ["day", a.moving_day_time_s || 0],
+    ["twilight", a.moving_twilight_time_s || 0],
+    ["night", a.moving_night_time_s || 0],
+    ["rest", rest],
   ];
-  const total = parts.reduce((acc, [, , v]) => acc + v, 0);
+  const total = parts.reduce((acc, [, v]) => acc + v, 0);
   if (total <= 0) return null;
   return el(
     "div",
     { class: "summary-bar" },
     ...parts
-      .filter(([, , v]) => v > 0)
-      .map(([key, label, v]) =>
-        el("div", {
-          class: `seg seg-${key}`,
-          style: `flex-grow:${v}`,
-          title: `${label}: ${fmtDur(v)} (${fmtPct(v / total)})`,
-        }),
-      ),
+      .filter(([, v]) => v > 0)
+      .map(([key, v]) => {
+        const pct = fmtPct(v / total);
+        const label = key[0].toUpperCase() + key.slice(1);
+        return el(
+          "div",
+          {
+            class: `seg seg-${key}`,
+            style: `flex:${v} 1 0`,
+            title: `${label}: ${fmtDur(v)} (${pct})`,
+          },
+          el("span", { class: `icon dn-${key}` }),
+          el("span", { class: "seg-label" }, pct),
+        );
+      }),
   );
 }
 
