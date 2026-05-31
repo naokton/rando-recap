@@ -1287,40 +1287,61 @@ function summaryItem(label, value) {
   );
 }
 
-// Horizontal stacked bar visualizing how the whole ride's Elapsed time divides
-// into moving (day/twilight/night) and rest — the four parts sum to Elapsed.
-// Segment widths are proportional (flex-grow); each shows its day/night glyph
-// (reusing the `dn-*` icons) and share inline, clipped on segments too narrow
-// to fit, with a tooltip carrying the label and exact duration.
-function summaryBar(a) {
+// The whole ride's Elapsed time split into the four segments the summary bar and
+// its legend both render — moving time as day/twilight/night, then rest = elapsed
+// − moving. Each entry is [key, label, seconds]; the four sum to Elapsed.
+function dnRestParts(a) {
   const rest = Math.max(0, a.elapsed_time_s - a.moving_time_s);
-  const parts = [
-    ["day", a.moving_day_time_s || 0],
-    ["twilight", a.moving_twilight_time_s || 0],
-    ["night", a.moving_night_time_s || 0],
-    ["rest", rest],
+  return [
+    ["day", "Day", a.moving_day_time_s || 0],
+    ["twilight", "Twilight", a.moving_twilight_time_s || 0],
+    ["night", "Night", a.moving_night_time_s || 0],
+    ["rest", "Rest", rest],
   ];
-  const total = parts.reduce((acc, [, v]) => acc + v, 0);
+}
+
+// Horizontal stacked bar visualizing how the whole ride's Elapsed time divides
+// into moving (day/twilight/night) and rest. Segment widths are proportional
+// (flex-grow); each shows its day/night glyph (reusing the `dn-*` icons) and
+// share inline, clipped on segments too narrow to fit, with a tooltip label.
+function summaryBar(a) {
+  const parts = dnRestParts(a);
+  const total = parts.reduce((acc, [, , v]) => acc + v, 0);
   if (total <= 0) return null;
   return el(
     "div",
     { class: "summary-bar" },
     ...parts
-      .filter(([, v]) => v > 0)
-      .map(([key, v]) => {
-        const pct = fmtPct(v / total);
-        const label = key[0].toUpperCase() + key.slice(1);
-        return el(
+      .filter(([, , v]) => v > 0)
+      .map(([key, label, v]) =>
+        el(
           "div",
-          {
-            class: `seg seg-${key}`,
-            style: `flex:${v} 1 0`,
-            title: `${label}: ${fmtDur(v)} (${pct})`,
-          },
+          { class: `seg seg-${key}`, style: `flex:${v} 1 0`, title: label },
           el("span", { class: `icon dn-${key}` }),
-          el("span", { class: "seg-label" }, pct),
-        );
-      }),
+          el("span", { class: "seg-label" }, fmtPct(v / total)),
+        ),
+      ),
+  );
+}
+
+// Durations for the bar's four segments, color-matched to the bar — keeps the
+// exact day/twilight/night/rest times that used to sit in the Moving breakdown,
+// relocated to read as the summary bar's own legend. Glyph + duration only; the
+// segment name is conveyed by the glyph (and the bar's own tooltip).
+function barLegend(a) {
+  return el(
+    "div",
+    { class: "bar-legend" },
+    ...dnRestParts(a)
+      .filter(([, , v]) => v > 0)
+      .map(([key, label, v]) =>
+        el(
+          "div",
+          { class: `legend-item lg-${key}` },
+          el("span", { class: `icon dn-${key}`, title: label }),
+          el("span", { class: "lg-value" }, fmtDur(v)),
+        ),
+      ),
   );
 }
 
@@ -2151,34 +2172,38 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
     root.appendChild(el("div", { class: "source-links" }, ...links));
   }
 
+  // Two groups: physical metrics, then a time block stacking headline figures
+  // over the summary bar and its breakdown legend (Elapsed = the four segments).
+  const timeGroup = el(
+    "div",
+    { class: "metric-group time-group" },
+    el(
+      "div",
+      { class: "time-figures" },
+      summaryItem("Elapsed", fmtDur(a.elapsed_time_s)),
+      summaryItem("Moving", fmtDur(a.moving_time_s)),
+    ),
+  );
+  const bar = summaryBar(a);
+  if (bar) {
+    timeGroup.appendChild(bar);
+    timeGroup.appendChild(barLegend(a));
+  }
   root.appendChild(
     el(
       "div",
       { class: "summary" },
-      summaryItem("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
-      summaryItem("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
-      summaryItem("Coast", fmtPct(a.coasting_frac)),
-      summaryItem("Elapsed", fmtDur(a.elapsed_time_s)),
       el(
         "div",
-        { class: "item" },
-        el("span", { class: "label" }, "Moving:"),
-        el("span", { class: "value" }, fmtDur(a.moving_time_s)),
-        el(
-          "div",
-          { class: "breakdown" },
-          summaryDnRow("day", fmtDur(a.moving_day_time_s)),
-          summaryDnRow("twilight", fmtDur(a.moving_twilight_time_s)),
-          summaryDnRow("night", fmtDur(a.moving_night_time_s)),
-        ),
+        { class: "metric-group" },
+        summaryItem("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
+        summaryItem("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+        summaryItem("Coast", fmtPct(a.coasting_frac)),
+        summaryItem("Temp", fmtTempRange(a.temp_avg_c, a.temp_min_c, a.temp_max_c)),
       ),
-      summaryItem("Rest", fmtDur(a.elapsed_time_s - a.moving_time_s)),
-      summaryItem("Temp", fmtTempRange(a.temp_avg_c, a.temp_min_c, a.temp_max_c)),
+      timeGroup,
     ),
   );
-
-  const bar = summaryBar(a);
-  if (bar) root.appendChild(bar);
 
   const model = buildTimelineModel(data.stops, data.segments);
 
