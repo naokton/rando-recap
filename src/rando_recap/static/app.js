@@ -1844,22 +1844,6 @@ function buildChart(data, model, onHoverIndex = () => {}) {
       );
     }
 
-    // Rest bands across the plot, keyed for linked hover.
-    stops.forEach((c, i) => {
-      const x0 = xScale(c.time_before_s);
-      const x1 = xScale(c.time_after_s);
-      root.appendChild(
-        svgNode("rect", {
-          class: "chart-rest",
-          "data-stop": `c${i}`,
-          x: x0,
-          y: top,
-          width: Math.max(1, x1 - x0),
-          height: innerH,
-        }),
-      );
-    });
-
     // Y gridlines + labels. niceTicks bounds every tick to [yMin, yMax].
     for (const t of yTicks) {
       const y = yScale(t);
@@ -1874,6 +1858,23 @@ function buildChart(data, model, onHoverIndex = () => {}) {
         ),
       );
     }
+
+    // Rest bands across the plot, keyed for linked hover. Painted after the
+    // gridlines with an opaque fill so the horizontal lines don't show through.
+    stops.forEach((c, i) => {
+      const x0 = xScale(c.time_before_s);
+      const x1 = xScale(c.time_after_s);
+      root.appendChild(
+        svgNode("rect", {
+          class: "chart-rest",
+          "data-stop": `c${i}`,
+          x: x0,
+          y: top,
+          width: Math.max(1, x1 - x0),
+          height: innerH,
+        }),
+      );
+    });
 
     // X (time) ticks, labeled as clock time in the ride's local zone.
     const maxXTicks = Math.max(3, Math.floor(innerW / 90));

@@ -2,6 +2,7 @@
   --fg: #1a1a1a;
   --muted: #6b7280;
   --border: #e5e7eb;
+  --border-strong: #babfca;
   --accent: #047857;
   --accent-hover: #036648;
   --bg: white;
@@ -827,13 +828,14 @@ body.map-fullscreen-active {
   pointer-events: none;
 }
 /* Rest spans: faint stop-colored fill, brighter when their stop is hovered. */
+/* Opaque gray fills so the band covers the gridlines it's painted over instead
+   of letting them show through. */
 .chart-rest {
-  fill: var(--stop);
-  fill-opacity: 0.12;
+  fill: var(--border);
   pointer-events: none;
 }
 .chart-rest.hl {
-  fill-opacity: 0.35;
+  fill: var(--border-strong);
 }
 .chart-line {
   fill: none;
