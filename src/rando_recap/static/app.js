@@ -1317,7 +1317,7 @@ function dnRestBar(parts) {
       .map(([key, label, v]) =>
         el(
           "div",
-          { class: `seg seg-${key}`, style: `flex:${v} 1 0`, title: label },
+          { class: `seg seg-${key}`, style: `flex:${v} 1 0`, title: `${label} ${fmtPct(v / total)}` },
           el("span", { class: `icon dn-${key}` }),
           el("span", { class: "seg-label" }, fmtPct(v / total)),
         ),
