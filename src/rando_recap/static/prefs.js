@@ -3,7 +3,7 @@
 
 export const DEFAULT_MIN_DIST_KM = 190;
 export const DEFAULT_MIN_STOP = "5m";
-export const DEFAULT_MERGE_WITHIN_M = 100;
+const DEFAULT_MERGE_WITHIN_M = 100;
 const DEFAULT_FETCH_SINCE = "1m";
 const DEFAULT_CHART_METRIC = "elevation";
 const STORAGE_KEY_USER_PARAMS = "rando-recap.user-params";
