@@ -57,6 +57,8 @@ def build_payload(result: AnalysisResult, *, include_latlng: bool = True) -> dic
             "temperature": s.temp,
             "power": s.watts,
             "speed": s.series("velocity_smooth"),
+            "heartrate": s.heartrate,
+            "cadence": s.cadence,
         }
     return payload
 

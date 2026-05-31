@@ -1646,6 +1646,8 @@ const CHART_METRICS = [
   { id: "elevation", label: "Elevation", unit: "m", digits: 0, scale: 1 },
   { id: "speed", label: "Speed", unit: "km/h", digits: 1, scale: 3.6 },
   { id: "power", label: "Power", unit: "W", digits: 0, scale: 1 },
+  { id: "heartrate", label: "HR", unit: "bpm", digits: 0, scale: 1 },
+  { id: "cadence", label: "Cadence", unit: "rpm", digits: 0, scale: 1 },
   { id: "temperature", label: "Temp", unit: "°C", digits: 0, scale: 1 },
 ];
 const CHART_HEIGHT = 210;
