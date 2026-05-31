@@ -1300,12 +1300,13 @@ function dnRestParts(a) {
   ];
 }
 
-// Horizontal stacked bar visualizing how the whole ride's Elapsed time divides
-// into moving (day/twilight/night) and rest. Segment widths are proportional
-// (flex-grow); each shows its day/night glyph (reusing the `dn-*` icons) and
-// share inline, clipped on segments too narrow to fit, with a tooltip label.
-function summaryBar(a) {
-  const parts = dnRestParts(a);
+// Horizontal stacked bar visualizing how an Elapsed time divides into moving
+// (day/twilight/night) and rest. Takes normalized [key, label, seconds] parts so
+// the whole-ride summary and the per-pane summaries can share one bar. Segment
+// widths are proportional (flex-grow); each shows its day/night glyph (reusing
+// the `dn-*` icons) and share inline, clipped on segments too narrow to fit,
+// with a tooltip label.
+function dnRestBar(parts) {
   const total = parts.reduce((acc, [, , v]) => acc + v, 0);
   if (total <= 0) return null;
   return el(
@@ -1324,15 +1325,14 @@ function summaryBar(a) {
   );
 }
 
-// Durations for the bar's four segments, color-matched to the bar — keeps the
-// exact day/twilight/night/rest times that used to sit in the Moving breakdown,
-// relocated to read as the summary bar's own legend. Glyph + duration only; the
-// segment name is conveyed by the glyph (and the bar's own tooltip).
-function barLegend(a) {
+// Durations for the bar's four segments, color-matched to the bar — the exact
+// day/twilight/night/rest times, read as the bar's own legend. Glyph + duration
+// only; the segment name is conveyed by the glyph (and the bar's own tooltip).
+function dnRestLegend(parts) {
   return el(
     "div",
     { class: "bar-legend" },
-    ...dnRestParts(a)
+    ...parts
       .filter(([, , v]) => v > 0)
       .map(([key, label, v]) =>
         el(
@@ -1345,13 +1345,13 @@ function barLegend(a) {
   );
 }
 
-function summaryDnRow(state, value) {
-  return el(
-    "div",
-    { class: "dn-row" },
-    el("span", { class: `dn-label icon dn-${state}`, title: state }),
-    el("span", { class: "dn-value" }, value),
-  );
+// Whole-ride summary bar + legend: thin wrappers that compute the four parts
+// from Strava activity aggregates, then defer to the shared dn/rest builders.
+function summaryBar(a) {
+  return dnRestBar(dnRestParts(a));
+}
+function barLegend(a) {
+  return dnRestLegend(dnRestParts(a));
 }
 
 // Per-split summary: the whole-ride distance/elapsed/etc are Strava aggregates
@@ -1372,23 +1372,28 @@ function paneSummary(segs, elapsedS) {
   const tempMaxs = segs.map((s) => s.temp_max).filter((v) => v != null);
   const tempMin = tempMins.length ? Math.min(...tempMins) : null;
   const tempMax = tempMaxs.length ? Math.max(...tempMaxs) : null;
+  // Same four parts the whole-ride summary bar draws, scoped to this pane:
+  // moving as day/twilight/night, then rest = Elapsed − Moving.
+  const restS = Math.max(0, elapsedS - movingS);
+  const dnParts = [
+    ["day", "Day", sum((s) => s.day_s)],
+    ["twilight", "Twilight", sum((s) => s.twilight_s)],
+    ["night", "Night", sum((s) => s.night_s)],
+    ["rest", "Rest", restS],
+  ];
   return el(
     "div",
     { class: "pane-summary" },
     summaryItem("Dist", `${(sum((s) => s.distance_m) / 1000).toFixed(1)} km`),
     summaryItem("Climb", `${Math.round(sum((s) => s.climb_m))} m`),
     summaryItem("Coast", fmtPct(coastFrac)),
+    summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
     summaryItem("Elapsed", fmtDur(elapsedS)),
     summaryItem("Moving", fmtDur(movingS)),
-    summaryItem("Rest", fmtDur(Math.max(0, elapsedS - movingS))),
-    summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
-    el(
-      "div",
-      { class: "pane-dn" },
-      summaryDnRow("day", fmtDur(sum((s) => s.day_s))),
-      summaryDnRow("twilight", fmtDur(sum((s) => s.twilight_s))),
-      summaryDnRow("night", fmtDur(sum((s) => s.night_s))),
-    ),
+    // Stacked bar + its day/twilight/night/rest legend, in the same order and
+    // shape as the whole-ride summary's bar + legend, scoped to this pane.
+    dnRestBar(dnParts),
+    dnRestLegend(dnParts),
   );
 }
 

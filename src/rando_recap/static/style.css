@@ -548,10 +548,6 @@ table.rides.merge-mode tbody tr.selected:hover {
   color: var(--fg);
   font-weight: 600;
 }
-.dn-label.icon::before {
-  width: 14px;
-  height: 14px;
-}
 /* Stacked bar beneath the summary: Elapsed split into moving day/twilight/night
    and rest. Segment widths are proportional via flex-grow; colors match the
    day/night map palette, with rest in neutral gray. Each segment shows its
@@ -811,20 +807,17 @@ table.data.segments tr.row.split-border td {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-.pane-summary .pane-dn {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-  color: var(--muted);
+/* Reuse the whole-ride .summary-bar inside each split pane, just shorter and on
+   its own full-width line within the pane's wrapping flex layout. */
+.pane-summary .summary-bar {
+  flex: 1 0 100%;
+  height: 18px;
+  margin: 2px 0;
   font-size: 11px;
-  font-variant-numeric: tabular-nums;
 }
-.pane-summary .pane-dn .dn-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+/* The bar's legend (day/twilight/night/rest) sits on its own line below it. */
+.pane-summary .bar-legend {
+  flex: 1 0 100%;
 }
 .leaflet-map.map-fullscreen {
   position: fixed !important;
