@@ -1061,7 +1061,7 @@ function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
     const line = L.polyline(latlng.slice(clip[0], clip[1] + 1), baseStyle).addTo(map);
     registerMapPeer("seg", s.label, line, (on) => {
       if (on) {
-        line.setStyle({ color: SEGMENT_HOVER_COLOR, weight: 6, opacity: 1 });
+        line.setStyle({ color: SEGMENT_HOVER_COLOR, weight: 4.5, opacity: 1 });
         line.bringToFront();
       } else {
         line.setStyle(baseStyle);
