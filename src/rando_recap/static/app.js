@@ -1203,7 +1203,8 @@ function attachMapResizer(mapDiv, handle) {
 }
 
 function renderMap(container, data, model, range, ctx) {
-  const { latlng, segments, stops, daynight, activity } = data;
+  const { segments, stops, daynight, activity } = data;
+  const latlng = data.series.latlng;
   if (!latlng || !latlng.length) {
     container.appendChild(el("div", { class: "empty" }, "No GPS data."));
     return null;
@@ -1350,7 +1351,7 @@ function buildMapArea(mapWrap, summaryWrap, data, model) {
   // driven by the chart's crosshair. The marker lands on whichever pane owns
   // that index; other panes hide theirs.
   const setHoverIndex = (idx) => {
-    const ll = idx == null ? null : data.latlng[idx];
+    const ll = idx == null ? null : data.series.latlng[idx];
     for (const p of panesRendered) {
       const inRange = ll && idx >= p.range.startIdx && idx <= p.range.endIdx;
       if (inRange) {
@@ -1422,7 +1423,7 @@ function buildMapArea(mapWrap, summaryWrap, data, model) {
     teardown();
     mapWrap.innerHTML = "";
     summaryWrap.innerHTML = "";
-    const last = data.latlng.length - 1;
+    const last = data.series.latlng.length - 1;
     const boundaries = splits.map((i) => splitInfoForStop(data.stops, i));
     // N splits → N+1 panes. Pane k runs from the previous split's afterIdx (or
     // the track start) to the next split's beforeIdx (or the track end). Each
