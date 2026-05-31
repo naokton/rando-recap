@@ -19,6 +19,7 @@
   --stop: #dc2626;
   --twilight: #1c8bc4;
   --night: #033b73;
+  --rest: #cbd5e1;
   --pin-start: #4a72a8;
   --pin-end: #b55b56;
 }
@@ -479,7 +480,7 @@ table.rides.merge-mode tbody tr.selected:hover {
   flex-wrap: wrap;
   align-items: start;
   gap: 8px 32px;
-  margin: 8px 0 16px;
+  margin: 8px 0;
 }
 .summary .item {
   display: flex;
@@ -514,6 +515,36 @@ table.rides.merge-mode tbody tr.selected:hover {
 .dn-label.icon::before {
   width: 14px;
   height: 14px;
+}
+/* Stacked bar beneath the summary: Elapsed split into moving day/twilight/night
+   and rest. Segment widths are proportional via flex-grow; colors match the
+   day/night map palette, with rest in neutral gray. Details live in tooltips. */
+.summary-bar {
+  display: flex;
+  width: 100%;
+  height: 20px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-soft);
+}
+.summary-bar .seg {
+  min-width: 2px;
+}
+.summary-bar .seg:not(:last-child) {
+  border-right: 1px solid var(--bg);
+}
+.summary-bar .seg-day {
+  background: var(--segment);
+}
+.summary-bar .seg-twilight {
+  background: var(--twilight);
+}
+.summary-bar .seg-night {
+  background: var(--night);
+}
+.summary-bar .seg-rest {
+  background: var(--rest);
 }
 .dn-day {
   --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/sun.svg");

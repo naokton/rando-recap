@@ -1287,6 +1287,35 @@ function summaryItem(label, value) {
   );
 }
 
+// Horizontal stacked bar visualizing how the whole ride's Elapsed time divides
+// into moving (day/twilight/night) and rest — the four parts sum to Elapsed.
+// Segment widths are proportional (flex-grow); each carries a tooltip with its
+// duration and share. Returns null when there's nothing to plot.
+function summaryBar(a) {
+  const rest = Math.max(0, a.elapsed_time_s - a.moving_time_s);
+  const parts = [
+    ["day", "Day", a.moving_day_time_s || 0],
+    ["twilight", "Twilight", a.moving_twilight_time_s || 0],
+    ["night", "Night", a.moving_night_time_s || 0],
+    ["rest", "Rest", rest],
+  ];
+  const total = parts.reduce((acc, [, , v]) => acc + v, 0);
+  if (total <= 0) return null;
+  return el(
+    "div",
+    { class: "summary-bar" },
+    ...parts
+      .filter(([, , v]) => v > 0)
+      .map(([key, label, v]) =>
+        el("div", {
+          class: `seg seg-${key}`,
+          style: `flex-grow:${v}`,
+          title: `${label}: ${fmtDur(v)} (${fmtPct(v / total)})`,
+        }),
+      ),
+  );
+}
+
 function summaryDnRow(state, value) {
   return el(
     "div",
@@ -2139,6 +2168,9 @@ async function renderAnalysis(rideId, minStop, mergeWithinM, refresh = false) {
       summaryItem("Temp", fmtTempRange(a.temp_avg_c, a.temp_min_c, a.temp_max_c)),
     ),
   );
+
+  const bar = summaryBar(a);
+  if (bar) root.appendChild(bar);
 
   const model = buildTimelineModel(data.stops, data.segments);
 
