@@ -735,7 +735,6 @@ table.data.segments tr.row.split-border td {
 #map {
   height: 480px;
   min-height: 200px;
-  border-radius: 4px 4px 0 0;
   overflow: hidden;
 }
 .pane-summaries {
@@ -748,6 +747,7 @@ table.data.segments tr.row.split-border td {
 #map .leaflet-map {
   height: 100%;
   border: 1px solid var(--border);
+  border-radius: 4px;
 }
 /* Equal-width columns; min-width:0 lets each shrink to its share so a summary
    stays aligned under its map. */
@@ -802,10 +802,10 @@ table.data.segments tr.row.split-border td {
 }
 .map-resize-handle {
   height: 10px;
+  margin: 4px 0;
   background: var(--bg-soft);
   border: 1px solid var(--border);
-  border-top: none;
-  border-radius: 0 0 4px 4px;
+  border-radius: 2px;
   cursor: ns-resize;
   display: flex;
   align-items: center;
