@@ -3,21 +3,14 @@
 // and boots the app. Nothing imports this module except the entry point — views
 // reach the host and nav directly, so the graph stays a pure DAG.
 import { root, fetchJson } from "./utils.js";
-import {
-  saveUserParams,
-  loadUserParams,
-  parseMergeWithin,
-  minStopToSeconds,
-  secondsToHMS,
-  DEFAULT_MIN_STOP,
-  MIN_STOP_FLOOR_S,
-} from "./prefs.js";
+import { saveUserParams } from "./prefs.js";
 import { parseHash } from "./nav.js";
 import * as ViewHost from "./viewhost.js";
 import { wireHover } from "./hover.js";
 import { ListView } from "./list.js";
 import { AnalysisView } from "./analysis.js";
 import { SignInView } from "./signin.js";
+import { mountConfig } from "./config.js";
 
 // Dispatch the current hash to a view. Invoked from boot()'s initial dispatch,
 // the hashchange listener, and applyConfig — never from inside a view.
@@ -46,71 +39,15 @@ function applyConfig(partial) {
   }
 }
 
-// --- config dialog ------------------------------------------------------
-function setupConfigDialog() {
-  const dialog = document.getElementById("config-dialog");
-  const form = document.getElementById("config-form");
-  const minStopH = document.getElementById("cfg-min-stop-h");
-  const minStopM = document.getElementById("cfg-min-stop-m");
-  const minStopS = document.getElementById("cfg-min-stop-s");
-  const mergeInput = document.getElementById("cfg-merge");
-
-  const readMinStopSeconds = () =>
-    (parseInt(minStopH.value, 10) || 0) * 3600 +
-    (parseInt(minStopM.value, 10) || 0) * 60 +
-    (parseInt(minStopS.value, 10) || 0);
-
-  // Clear the custom invalid state as soon as a field changes; otherwise it
-  // sticks and the browser blocks the next submit before our handler runs.
-  for (const input of [minStopH, minStopM, minStopS]) {
-    input.addEventListener("input", () => minStopS.setCustomValidity(""));
-  }
-
-  document.getElementById("config-btn").addEventListener("click", () => {
-    const saved = loadUserParams();
-    const { h, m, s } = secondsToHMS(
-      minStopToSeconds(saved.minStop) ?? minStopToSeconds(DEFAULT_MIN_STOP),
-    );
-    minStopH.value = h;
-    minStopM.value = m;
-    minStopS.value = s;
-    mergeInput.value = saved.mergeWithinM;
-    dialog.showModal();
-  });
-
-  document.getElementById("cfg-cancel").addEventListener("click", () => dialog.close());
-
-  form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const minStopSeconds = readMinStopSeconds();
-    if (minStopSeconds <= MIN_STOP_FLOOR_S) {
-      minStopS.setCustomValidity(`Min stop must be greater than ${MIN_STOP_FLOOR_S}s.`);
-      minStopS.reportValidity();
-      return;
-    }
-    minStopS.setCustomValidity("");
-    const minStop = `${minStopSeconds}s`;
-    const mergeWithinM = parseMergeWithin(mergeInput.value);
-
-    dialog.close();
-    // applyConfig persists the prefs and re-renders only if the current view
-    // depends on them — the dialog stays oblivious to routing.
-    applyConfig({ minStop, mergeWithinM });
-  });
-}
-
 // The whole app needs a Strava token. Check auth once at startup: render the
 // sign-in screen when there's no token, otherwise wire up routing. The OAuth
 // callback redirects back to "/", so a fresh load re-runs boot() and lands on
 // the normal view once authenticated.
 export async function boot() {
-  // wireHover and the config dialog must be wired before the unauthenticated
-  // early-return: the header's settings button (#config-btn) lives outside #root
-  // and is present on the sign-in screen too, and the hover delegation lives on
-  // the persistent #root. Both are wiring-only — no side effects until a view
-  // populates the DOM they delegate over.
+  // Hover delegation lives on the persistent #root and is wiring-only (no side
+  // effects until a view populates the DOM it delegates over), so it's wired
+  // before the unauthenticated early-return.
   wireHover(root);
-  setupConfigDialog();
 
   let status;
   try {
@@ -124,6 +61,11 @@ export async function boot() {
     ViewHost.show(SignInView(status.configured));
     return;
   }
+  // Settings are only meaningful once authenticated, so the button + dialog are
+  // built and inserted here rather than living in the static shell — the
+  // sign-in screen carries no settings UI. applyConfig is passed in so config.js
+  // stays oblivious to routing.
+  mountConfig(applyConfig);
   window.addEventListener("hashchange", route);
   route();
 }
