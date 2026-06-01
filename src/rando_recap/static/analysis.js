@@ -19,6 +19,7 @@ import { beginHover, endHover } from "./hover.js";
 import { summaryItem, summaryBar, barLegend } from "./summary.js";
 import { buildMapArea } from "./map.js";
 import { buildChart } from "./chart.js";
+import { createSplits } from "./splits.js";
 import * as ViewHost from "./viewhost.js";
 
 // --- section tabs ------------------------------------------------------
@@ -63,6 +64,17 @@ function stopKeyAt(index, stopCount) {
   return `c${index - 1}`;
 }
 
+// Toggle .split-stop on every element under `container` whose data-stop key
+// names a current split point (interior stops are keyed "c{i}"). Shared by the
+// timeline and the Stops table, each of which subscribes to the splits store
+// and marks its own subtree.
+function markSplitStops(container, splitIndices) {
+  const keys = new Set(splitIndices.map((i) => `c${i}`));
+  container
+    .querySelectorAll("[data-stop]")
+    .forEach((e) => e.classList.toggle("split-stop", keys.has(e.dataset.stop)));
+}
+
 function buildTimelineModel(stops, segments) {
   const stopLabels = ["Start", ...stops.map((_, i) => `S${i + 1}`), "End"];
   const segByLabel = Object.fromEntries(segments.map((s) => [s.label, s]));
@@ -85,7 +97,7 @@ function buildTimelineModel(stops, segments) {
   return { stopLabels, segLabels, segArrivesAt, orderedSegs, cumKm, endS };
 }
 
-function renderTimeline(activity, stops, model) {
+function renderTimeline(activity, stops, model, splits) {
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
   const { stopLabels, segLabels, orderedSegs, cumKm, endS } = model;
 
@@ -165,11 +177,13 @@ function renderTimeline(activity, stops, model) {
   });
 
   wrap.appendChild(grid);
-  return wrap;
+  // Mark the split stops in our own grid whenever the store changes.
+  const unsub = splits.subscribe((cur) => markSplitStops(wrap, cur));
+  return { el: wrap, unsub };
 }
 
 // --- tables ------------------------------------------------------------
-function renderStopsTable(activity, stops, model, onToggleSplit) {
+function renderStopsTable(activity, stops, model, splits) {
   const { cumKm, endS } = model;
   const fmtClock = makeClockFmt(activity.start_date, activity.utc_offset_s);
   // Bookend the stops with Start/End rows so the table lines up row-for-row
@@ -188,18 +202,18 @@ function renderStopsTable(activity, stops, model, onToggleSplit) {
       el("td", { class: "split-cell" }, splitCell),
     );
   // Only the interior stops are splittable; the Start/End bookends get an empty
-  // cell. The checkbox's checked state is owned by buildMapArea.syncSplitStops
-  // (single source of truth = the splits set), so onToggleSplit just reports the
-  // click and the re-render flips it back if needed.
+  // cell. The checkbox just toggles the shared splits store (single source of
+  // truth); the subscription below re-derives every checkbox's checked state,
+  // so a split added elsewhere (map menu, pane ✕) flows back here.
   const splitToggle = (i) =>
     el("input", {
       type: "checkbox",
       class: "split-toggle",
       title: "Split route here",
       "aria-label": `Split route at S${i + 1}`,
-      onchange: () => onToggleSplit(i),
+      onchange: () => splits.toggle(i),
     });
-  return el(
+  const table = el(
     "table",
     { class: "data" },
     el(
@@ -234,10 +248,20 @@ function renderStopsTable(activity, stops, model, onToggleSplit) {
       row("end", "End", fmtNum(cumKm[cumKm.length - 1], 1), fmtClock(endS), "-", "-", null),
     ),
   );
+  // Own our own marks: highlight split rows and re-derive each checkbox.
+  const unsub = splits.subscribe((cur) => {
+    markSplitStops(table, cur);
+    const set = new Set(cur);
+    table.querySelectorAll("tr[data-stop] input.split-toggle").forEach((cb) => {
+      const key = cb.closest("tr").dataset.stop;
+      cb.checked = key.startsWith("c") && set.has(Number(key.slice(1)));
+    });
+  });
+  return { el: table, unsub };
 }
 
-function renderSegmentsTable(segments, model) {
-  return el(
+function renderSegmentsTable(segments, model, splits) {
+  const table = el(
     "table",
     { class: "data segments" },
     el(
@@ -285,6 +309,15 @@ function renderSegmentsTable(segments, model) {
       ),
     ),
   );
+  // Thicken the divider on each row arriving at a split stop (data-arrives-at
+  // "c{i}"), so the table shows where the route is cut.
+  const unsub = splits.subscribe((cur) => {
+    const keys = new Set(cur.map((i) => `c${i}`));
+    table
+      .querySelectorAll("tr.row[data-arrives-at]")
+      .forEach((tr) => tr.classList.toggle("split-border", keys.has(tr.dataset.arrivesAt)));
+  });
+  return { el: table, unsub };
 }
 
 // --- analysis view -----------------------------------------------------
@@ -305,6 +338,9 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
   let map = null;
   let chart = null;
   let hovering = false;
+  // Unsubscribe fns for the splits-store subscriptions (timeline, tables);
+  // populated on resolve, drained in destroy. The map manages its own.
+  const disposers = [];
 
   const qs = new URLSearchParams({
     min_stop: minStop,
@@ -321,6 +357,9 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
 
       const a = data.activity;
       const model = buildTimelineModel(data.stops, data.segments);
+      // Shared split state: the map, the timeline, and the tables all read and
+      // mutate this one store rather than reaching into each other's DOM.
+      const splits = createSplits();
 
       // Re-fetch this ride's streams from Strava — a re-render in place, so the
       // host disposes the current view before mounting the fresh one.
@@ -408,27 +447,26 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
       );
 
       // Map — owns its whole subtree (maps + resize handle + per-pane summaries).
-      map = buildMapArea(data, model);
+      map = buildMapArea(data, model, splits);
 
       // Chart — full-width, directly below the map; whole-ride regardless of splits.
       chart = buildChart(data, model, (idx) => map && map.setHoverIndex(idx));
 
-      // Timeline / Tables — tabbed so only one shows at a time.
-      const timelinePanel = renderTimeline(data.activity, data.stops, model);
+      // Timeline / Tables — tabbed so only one shows at a time. Each subscribes
+      // to the splits store and hands back an unsubscribe for teardown.
+      const timeline = renderTimeline(data.activity, data.stops, model, splits);
+      const stopsTable = renderStopsTable(data.activity, data.stops, model, splits);
+      const segsTable = renderSegmentsTable(data.segments, model, splits);
+      disposers.push(timeline.unsub, stopsTable.unsub, segsTable.unsub);
       const tablesPanel = el(
         "div",
         { class: "tables-row" },
-        el(
-          "section",
-          {},
-          el("h2", {}, "Stops"),
-          renderStopsTable(data.activity, data.stops, model, (i) => map && map.toggleSplit(i)),
-        ),
-        el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments, model)),
+        el("section", {}, el("h2", {}, "Stops"), stopsTable.el),
+        el("section", {}, el("h2", {}, "Segments"), segsTable.el),
       );
       const tabs = buildSectionTabs([
         { label: "Tables", panel: tablesPanel },
-        { label: "Timeline", panel: timelinePanel },
+        { label: "Timeline", panel: timeline.el },
       ]);
 
       // replaceChildren rejects null, so drop the optional pieces (source links,
@@ -449,6 +487,7 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
       // May fire before the load resolves, so guard the pieces built on resolve.
       if (map) map.destroy();
       if (chart) chart.destroy();
+      for (const dispose of disposers) dispose();
       if (hovering) endHover();
     },
   };

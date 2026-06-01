@@ -1,10 +1,10 @@
 // Leaflet drawing, the map controls, the marker context menu, and buildMapArea
 // — the disposable component that owns the whole map subtree (the maps, the
 // resize handle, and the per-pane summaries) and returns
-// { el, destroy, toggleSplit, setHoverIndex }. Leaflet (`L`) is a global,
-// touched only inside functions that run after boot().
+// { el, destroy, setHoverIndex }. It rebuilds its panes off the shared `splits`
+// store (splits.js). Leaflet (`L`) is a global, touched only inside functions
+// that run after boot().
 import {
-  root,
   el,
   fmtDur,
   fmtUnit,
@@ -431,7 +431,7 @@ function paneSummary(segs, elapsedS) {
 // `el`. The handle resizes only #map (as before). destroy() removes every
 // Leaflet map, closes any open marker menu, and clears the hover peers it
 // registered.
-export function buildMapArea(data, model) {
+export function buildMapArea(data, model, splits) {
   // Maps live in #map (the only thing the drag handle resizes); the per-pane
   // summaries live in a matching column row below the handle.
   const mapWrap = el("div", { id: "map" });
@@ -443,9 +443,11 @@ export function buildMapArea(data, model) {
   const elRoot = el("div", { class: "map-area" }, mapWrap, resizeHandle, summaryWrap);
   attachMapResizer(mapWrap, resizeHandle);
 
-  let splits = []; // sorted ascending stop indices; [] = single-map mode
-  // One entry per rendered pane: its Leaflet map, the stream-index range it
-  // covers, and a lazily-created hover marker (the dot synced to the chart).
+  // The split points live in the shared `splits` store (see splits.js); this
+  // component reads them via splits.get() and rebuilds its panes whenever the
+  // store changes. One entry per rendered pane: its Leaflet map, the
+  // stream-index range it covers, and a lazily-created hover marker (the dot
+  // synced to the chart).
   let panesRendered = [];
 
   const teardown = () => {
@@ -482,60 +484,21 @@ export function buildMapArea(data, model) {
     }
   };
 
-  // Clicking "Split here" on a stop marker adds a split at that stop,
-  // carving the route into one more pane. Splitting an existing split stop
-  // is a no-op. Each split is removed via the ✕ on the pane to its right.
-  const onClickStop = (i) => {
-    if (splits.includes(i)) return;
-    splits = [...splits, i].sort((a, b) => a - b);
-    render();
-  };
-
-  const removeSplit = (stopIdx) => {
-    splits = splits.filter((i) => i !== stopIdx);
-    render();
-  };
-
-  // Toggle a split from the Stops table: add it if absent, drop it if already
-  // a split point. Same effect as "Split here" / the pane ✕, just driven by
-  // the table's per-row checkbox.
-  const toggleSplit = (i) => {
-    if (splits.includes(i)) splits = splits.filter((x) => x !== i);
-    else splits = [...splits, i].sort((a, b) => a - b);
-    render();
-  };
-
-  // Mark the current split stops in the timeline and Stops table (which carry
-  // matching data-stop="c{i}" keys) so they read as distinct from ordinary
-  // stops, and thicken the Segments-table divider at each split: the segment
-  // row arriving at stop i carries data-arrives-at="c{i}" (stamped by
-  // analysis.js), so its bottom border is the line between that stop's incoming
-  // and outgoing segments.
-  // The split markings live in the timeline and the Stops/Segments tables,
-  // which are siblings of this component under the analysis view — not inside
-  // elRoot — so query the shared #root that hosts the whole mounted view.
-  const syncSplitStops = () => {
-    root.querySelectorAll(".split-stop").forEach((e) => e.classList.remove("split-stop"));
-    root.querySelectorAll(".split-border").forEach((e) => e.classList.remove("split-border"));
-    // The Stops-table checkboxes mirror the splits set; clear then re-check so
-    // they stay in sync however a split was added (table, map menu, or ✕).
-    root.querySelectorAll("input.split-toggle").forEach((cb) => (cb.checked = false));
-    for (const i of splits) {
-      root.querySelectorAll(`[data-stop="c${i}"]`).forEach((e) => e.classList.add("split-stop"));
-      const cb = root.querySelector(`tr[data-stop="c${i}"] input.split-toggle`);
-      if (cb) cb.checked = true;
-      root
-        .querySelectorAll(`table.segments tr.row[data-arrives-at="c${i}"]`)
-        .forEach((tr) => tr.classList.add("split-border"));
-    }
-  };
+  // Clicking "Split here" on a stop marker adds a split at that stop, carving
+  // the route into one more pane; each split is removed via the ✕ on the pane
+  // to its right. Both just mutate the shared store — the subscription below
+  // re-renders. (Toggling from the Stops-table checkbox lives in analysis.js,
+  // driving the same store.)
+  const onClickStop = (i) => splits.add(i);
+  const removeSplit = (stopIdx) => splits.remove(stopIdx);
 
   const render = () => {
     teardown();
     mapWrap.innerHTML = "";
     summaryWrap.innerHTML = "";
+    const cur = splits.get();
     const last = data.series.latlng.length - 1;
-    const boundaries = splits.map((i) => splitInfoForStop(data.stops, i));
+    const boundaries = cur.map((i) => splitInfoForStop(data.stops, i));
     // N splits → N+1 panes. Pane k runs from the previous split's afterIdx (or
     // the track start) to the next split's beforeIdx (or the track end). Each
     // split stop is shown on the two panes it borders, and every pane but the
@@ -569,9 +532,8 @@ export function buildMapArea(data, model) {
         elapsed: endTime - startTime,
       });
     }
-    const isSplit = splits.length > 0;
+    const isSplit = cur.length > 0;
     summaryWrap.classList.toggle("split", isSplit);
-    syncSplitStops();
     // Single-map mode keeps the whole-ride summary up top; only split panes get
     // their own summary. Maps live in #map (the only thing the drag handle
     // resizes); the per-pane summaries live in a matching column row below the
@@ -591,8 +553,17 @@ export function buildMapArea(data, model) {
     }, 0);
   };
 
-  render();
-  return { el: elRoot, destroy: teardown, toggleSplit, setHoverIndex };
+  // Re-render the panes on every splits change; the immediate fire does the
+  // initial render. destroy stops reacting before tearing the maps down.
+  const unsub = splits.subscribe(render);
+  return {
+    el: elRoot,
+    destroy: () => {
+      unsub();
+      teardown();
+    },
+    setHoverIndex,
+  };
 }
 
 // --- map controls ------------------------------------------------------
