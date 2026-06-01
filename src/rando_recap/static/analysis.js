@@ -104,7 +104,7 @@ function renderTimeline(activity, stops, model) {
           "data-stop": stopKey,
         },
         el("div", { class: "lab" }, label),
-        el("div", { class: "km" }, `${cumKm[i].toFixed(1)} km`),
+        el("div", { class: "km" }, fmtUnit(cumKm[i], "km", 1)),
         el(
           "div",
           { class: "clock" },
@@ -133,10 +133,10 @@ function renderTimeline(activity, stops, model) {
       if (!s) {
         cell.appendChild(el("div", {}, "(no movement)"));
       } else {
-        cell.appendChild(el("div", { class: "km" }, `${(s.distance_m / 1000).toFixed(1)} km`));
+        cell.appendChild(el("div", { class: "km" }, fmtUnit(s.distance_m / 1000, "km", 1)));
         cell.appendChild(el("div", {}, fmtDur(s.duration_s)));
         cell.appendChild(
-          el("div", {}, s.avg_speed_mps == null ? "-" : `${fmtKmh(s.avg_speed_mps)} km/h`),
+          el("div", {}, `${fmtKmh(s.avg_speed_mps)} km/h`),
         );
         cell.appendChild(el("div", {}, fmtUnit(s.avg_hr, "bpm")));
         cell.appendChild(el("div", {}, fmtUnit(s.climb_m, "m↑")));
@@ -200,19 +200,19 @@ function renderStopsTable(activity, stops, model, onToggleSplit) {
     el(
       "tbody",
       {},
-      row("start", "Start", cumKm[0].toFixed(1), "-", fmtClock(0), "-", null),
+      row("start", "Start", fmtNum(cumKm[0], 1), "-", fmtClock(0), "-", null),
       stops.map((c, i) =>
         row(
           `c${i}`,
           `S${i + 1}`,
-          cumKm[i + 1].toFixed(1),
+          fmtNum(cumKm[i + 1], 1),
           fmtClock(c.time_before_s),
           fmtClock(c.time_after_s),
           fmtDur(c.rest_s),
           splitToggle(i),
         ),
       ),
-      row("end", "End", cumKm[cumKm.length - 1].toFixed(1), fmtClock(endS), "-", "-", null),
+      row("end", "End", fmtNum(cumKm[cumKm.length - 1], 1), fmtClock(endS), "-", "-", null),
     ),
   );
 }
@@ -248,7 +248,7 @@ function renderSegmentsTable(segments) {
           "tr",
           { class: "row", "data-seg": s.label },
           el("td", {}, s.label),
-          el("td", {}, (s.distance_m / 1000).toFixed(2)),
+          el("td", {}, fmtNum(s.distance_m / 1000, 2)),
           el("td", {}, fmtDur(s.duration_s)),
           el("td", {}, fmtKmh(s.avg_speed_mps)),
           el("td", {}, fmtNum(s.avg_watts)),
@@ -369,8 +369,8 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
         el(
           "div",
           { class: "metric-group" },
-          summaryItem("Distance", `${(a.distance_m / 1000).toFixed(1)} km`),
-          summaryItem("Climb", `${Math.round(a.total_elevation_gain_m || 0)} m`),
+          summaryItem("Distance", fmtUnit(a.distance_m / 1000, "km", 1)),
+          summaryItem("Climb", fmtUnit(a.total_elevation_gain_m, "m")),
           summaryItem("Coast", fmtPct(a.coasting_frac)),
           summaryItem("Temp", fmtTempRange(a.temp_avg_c, a.temp_min_c, a.temp_max_c)),
         ),

@@ -6,7 +6,7 @@
 // highlights its span here (and vice versa) via the shared linked-hover keys,
 // plus a crosshair reads out the value under the cursor. Always whole-ride, even
 // when the map is split into panes. buildChart returns { el, destroy }.
-import { el, svgNode, makeClockFmt, fmtDur, DAYNIGHT_COLORS } from "./utils.js";
+import { el, svgNode, makeClockFmt, fmtDur, fmtUnit, DAYNIGHT_COLORS } from "./utils.js";
 import { setHover } from "./hover.js";
 import { loadUserParams, saveUserParams } from "./prefs.js";
 
@@ -341,7 +341,7 @@ export function buildChart(data, model, onHoverIndex = () => {}) {
           dot.setAttribute("cx", xScale(time[idx]));
           dot.setAttribute("cy", yScale(v));
           hoverIdx = idx;
-          label = `${fmtClock(time[idx])} · ${v.toFixed(current.digits)} ${current.unit}`;
+          label = `${fmtClock(time[idx])} · ${fmtUnit(v, current.unit, current.digits)}`;
         }
       }
       emitHoverIndex(hoverIdx);

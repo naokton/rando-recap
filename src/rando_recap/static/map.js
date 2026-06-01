@@ -7,6 +7,7 @@ import {
   root,
   el,
   fmtDur,
+  fmtUnit,
   fmtPct,
   fmtTempRange,
   makeClockFmt,
@@ -402,8 +403,8 @@ function paneSummary(segs, elapsedS) {
   return el(
     "div",
     { class: "pane-summary" },
-    summaryItem("Dist", `${(sum((s) => s.distance_m) / 1000).toFixed(1)} km`),
-    summaryItem("Climb", `${Math.round(sum((s) => s.climb_m))} m`),
+    summaryItem("Dist", fmtUnit(sum((s) => s.distance_m) / 1000, "km", 1)),
+    summaryItem("Climb", fmtUnit(sum((s) => s.climb_m), "m")),
     summaryItem("Coast", fmtPct(coastFrac)),
     summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
     summaryItem("Elapsed", fmtDur(elapsedS)),

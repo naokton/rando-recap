@@ -2,7 +2,7 @@
 // (filter + fetch) they share. Each view returns { el, destroy }; each popover
 // returns { el, close } so its owning view can dispose its document listener
 // deterministically on teardown.
-import { el, fetchJson } from "./utils.js";
+import { el, fetchJson, fmtUnit } from "./utils.js";
 import {
   loadUserParams,
   saveUserParams,
@@ -387,7 +387,7 @@ export function ListView(minDist) {
                 cells.push(el("td", { class: "pick" }, cb));
               }
               cells.push(el("td", { class: "date" }, (r.datetime || "").slice(0, 10)));
-              cells.push(el("td", { class: "dist" }, `${r.distance_km.toFixed(1)} km`));
+              cells.push(el("td", { class: "dist" }, fmtUnit(r.distance_km, "km", 1)));
               cells.push(
                 el(
                   "td",
