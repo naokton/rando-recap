@@ -450,7 +450,7 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
       map = buildMapArea(data, model, splits);
 
       // Chart — full-width, directly below the map; whole-ride regardless of splits.
-      chart = buildChart(data, model, (idx) => map && map.setHoverIndex(idx));
+      chart = buildChart(data, model, splits, (idx) => map && map.setHoverIndex(idx));
 
       // Timeline / Tables — tabbed so only one shows at a time. Each subscribes
       // to the splits store and hands back an unsubscribe for teardown.

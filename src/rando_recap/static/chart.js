@@ -8,6 +8,7 @@
 // when the map is split into panes. buildChart returns { el, destroy }.
 import { el, svgNode, makeClockFmt, fmtDur, fmtUnit, DAYNIGHT_COLORS } from "./utils.js";
 import { setHover } from "./hover.js";
+import { openContextMenu, closeContextMenu } from "./menu.js";
 import { loadUserParams, saveUserParams } from "./prefs.js";
 
 const CHART_METRICS = [
@@ -48,7 +49,7 @@ function niceTicks(min, max, count = 4) {
 // lengthens so labels never crowd.
 const CHART_X_STEPS = [300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400, 172800];
 
-export function buildChart(data, model, onHoverIndex = () => {}) {
+export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   const series = data.series;
   if (!series || !Array.isArray(series.time) || series.time.length < 2) return null;
   const { activity, stops, segments } = data;
@@ -324,6 +325,9 @@ export function buildChart(data, model, onHoverIndex = () => {}) {
       setChartHover(hit ? hit.kind : null, hit ? hit.key : null);
 
       const restHit = hit && hit.kind === "stop" ? hit : null;
+      // Rest bands are clickable to split there, so flag them with a pointer;
+      // otherwise defer to the overlay's CSS crosshair (clear the override).
+      overlay.style.cursor = restHit ? "pointer" : "";
       let label;
       let hoverIdx = null;
       if (restHit) {
@@ -355,6 +359,17 @@ export function buildChart(data, model, onHoverIndex = () => {}) {
       tooltip.style.left = `${Math.max(0, tx)}px`;
       tooltip.style.top = `${top}px`;
     });
+    // Clicking a rest band offers "Split here" — the same action as the map's
+    // stop-marker menu, driving the shared splits store by stop index.
+    overlay.addEventListener("click", (e) => {
+      const rect = root.getBoundingClientRect();
+      const px = Math.max(left, Math.min(e.clientX - rect.left, left + innerW));
+      const t = ((px - left) / innerW) * tEnd;
+      const hit = hitAt(t);
+      if (!hit || hit.kind !== "stop") return;
+      const i = parseInt(hit.key.slice(1), 10);
+      openContextMenu(e, [{ label: "Split here", onSelect: () => splits.add(i) }]);
+    });
     overlay.addEventListener("mouseleave", () => {
       cross.style.display = "none";
       dot.style.display = "none";
@@ -377,6 +392,7 @@ export function buildChart(data, model, onHoverIndex = () => {}) {
     el: container,
     destroy: () => {
       ro.disconnect();
+      closeContextMenu();
       emitHoverIndex(null);
       setChartHover(null, null);
     },

@@ -1,4 +1,4 @@
-// Leaflet drawing, the map controls, the marker context menu, and buildMapArea
+// Leaflet drawing, the map controls, and buildMapArea
 // — the disposable component that owns the whole map subtree (the maps, the
 // resize handle, and the per-pane summaries) and returns
 // { el, destroy, setHoverIndex }. It rebuilds its panes off the shared `splits`
@@ -18,6 +18,7 @@ import {
 } from "./utils.js";
 import { registerMapPeer, clearMapPeers } from "./hover.js";
 import { summaryItem, dnRestBar, dnRestLegend } from "./summary.js";
+import { openContextMenu, closeContextMenu } from "./menu.js";
 
 const MIN_MAP_HEIGHT_PX = 200;
 // Stop marker radius (px) by *absolute* rest duration, so a given rest length
@@ -52,71 +53,6 @@ function stopMarkerRadius(restS) {
 function splitInfoForStop(stops, idx) {
   const c = stops[idx];
   return { beforeIdx: c.index_before, afterIdx: c.index_after, stopIdx: idx };
-}
-
-// --- marker context menu ----------------------------------------------
-// Lightweight native-style context menu shown at the cursor on click.
-// Only one menu can be open at a time; closes on outside click, Escape, or
-// scroll/resize (positions go stale).
-let activeMarkerMenu = null;
-
-function closeMarkerMenu() {
-  if (activeMarkerMenu) {
-    activeMarkerMenu.teardown();
-    activeMarkerMenu = null;
-  }
-}
-
-function openMarkerMenu(originalEvent, items) {
-  closeMarkerMenu();
-  const menu = el("div", { class: "marker-menu" });
-  for (const { label, onSelect } of items) {
-    menu.appendChild(
-      el(
-        "div",
-        {
-          class: "marker-menu-item",
-          onclick: () => {
-            closeMarkerMenu();
-            onSelect();
-          },
-        },
-        label,
-      ),
-    );
-  }
-  document.body.appendChild(menu);
-
-  // Clamp into the viewport so the menu never overflows off-screen.
-  const rect = menu.getBoundingClientRect();
-  const x = Math.max(0, Math.min(originalEvent.clientX, window.innerWidth - rect.width - 4));
-  const y = Math.max(0, Math.min(originalEvent.clientY, window.innerHeight - rect.height - 4));
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-
-  const onDocDown = (e) => {
-    if (!menu.contains(e.target)) closeMarkerMenu();
-  };
-  const onKey = (e) => {
-    if (e.key === "Escape") closeMarkerMenu();
-  };
-  const onMove = () => closeMarkerMenu();
-  // Defer the outside-click binding so the same click that opened the
-  // menu doesn't immediately close it.
-  setTimeout(() => document.addEventListener("mousedown", onDocDown, true), 0);
-  document.addEventListener("keydown", onKey);
-  window.addEventListener("resize", onMove);
-  window.addEventListener("scroll", onMove, true);
-
-  activeMarkerMenu = {
-    teardown: () => {
-      document.removeEventListener("mousedown", onDocDown, true);
-      document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onMove);
-      window.removeEventListener("scroll", onMove, true);
-      menu.remove();
-    },
-  };
 }
 
 // --- map ---------------------------------------------------------------
@@ -272,7 +208,9 @@ function drawStopMarkers(map, stops, range, onClickStop, startSplitStop, endSpli
     });
     if (onClickStop) {
       marker.on("click", (ev) => {
-        openMarkerMenu(ev.originalEvent, [{ label: "Split here", onSelect: () => onClickStop(i) }]);
+        openContextMenu(ev.originalEvent, [
+          { label: "Split here", onSelect: () => onClickStop(i) },
+        ]);
       });
     }
     return marker;
@@ -451,7 +389,7 @@ export function buildMapArea(data, model, splits) {
   let panesRendered = [];
 
   const teardown = () => {
-    closeMarkerMenu();
+    closeContextMenu();
     for (const p of panesRendered) p.map.remove();
     panesRendered = [];
     clearMapPeers();
