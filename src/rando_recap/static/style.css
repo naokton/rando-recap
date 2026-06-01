@@ -574,8 +574,25 @@ table.rides.merge-mode tbody tr.selected:hover {
   white-space: nowrap;
   /* Default text/glyph color for the dark moving segments; rest overrides it. */
   color: white;
+  /* Each segment exposes its fill as --seg-color so the hover rule can lighten
+     it in OKLCH (a flat +L step that reads the same on dark and light bands),
+     rather than filter:brightness() which scales multiplicatively and so lifts
+     the already-bright bands far more than the dark ones. */
+  background: var(--seg-color);
   /* Drive the progressive disclosure below off each segment's own width. */
   container-type: inline-size;
+  transition:
+    background 0.12s ease,
+    box-shadow 0.12s ease;
+}
+/* Hover: ring + a flat OKLCH lightness lift on the pointed-at segment so it
+   pops, leaving the rest as is. An inset box-shadow draws the border inward, so
+   it neither resizes the flex segment nor gets clipped by the bar's
+   overflow:hidden the way an outline would. --border-strong reads on both the
+   dark moving bands and the light rest band. */
+.summary-bar .seg:hover {
+  background: oklch(from var(--seg-color) calc(l + 0.1) c h);
+  box-shadow: inset 0 0 0 2px var(--border-strong);
 }
 .summary-bar .seg:not(:last-child) {
   border-right: 1px solid var(--bg);
@@ -602,16 +619,16 @@ table.rides.merge-mode tbody tr.selected:hover {
   }
 }
 .summary-bar .seg-day {
-  background: var(--segment);
+  --seg-color: var(--segment);
 }
 .summary-bar .seg-twilight {
-  background: var(--twilight);
+  --seg-color: var(--twilight);
 }
 .summary-bar .seg-night {
-  background: var(--night);
+  --seg-color: var(--night);
 }
 .summary-bar .seg-rest {
-  background: var(--rest);
+  --seg-color: var(--rest);
   color: var(--fg);
 }
 .dn-day {
