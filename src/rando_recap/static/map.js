@@ -150,7 +150,11 @@ function drawDaynightPath(map, latlng, daynight, range) {
 function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
   // When day/night colors are drawn, segment lines stay invisible (opacity 0)
   // but remain on the map so they're still hoverable peers for linked highlight.
-  const baseStyle = { color: SEGMENT_COLOR, weight: 3, opacity: hasDaynight ? 0 : 1 };
+  const baseStyle = {
+    color: SEGMENT_COLOR,
+    weight: 3,
+    opacity: hasDaynight ? 0 : 1,
+  };
   const lines = [];
   for (const s of segments) {
     const clip = clipToRange(s, range);
@@ -431,7 +435,10 @@ export function buildMapArea(data, model) {
   // Maps live in #map (the only thing the drag handle resizes); the per-pane
   // summaries live in a matching column row below the handle.
   const mapWrap = el("div", { id: "map" });
-  const resizeHandle = el("div", { class: "map-resize-handle", title: "Drag to resize map" });
+  const resizeHandle = el("div", {
+    class: "map-resize-handle",
+    title: "Drag to resize map",
+  });
   const summaryWrap = el("div", { class: "pane-summaries" });
   const elRoot = el("div", { class: "map-area" }, mapWrap, resizeHandle, summaryWrap);
   attachMapResizer(mapWrap, resizeHandle);
@@ -499,10 +506,11 @@ export function buildMapArea(data, model) {
   };
 
   // Mark the current split stops in the timeline and Stops table (which carry
-  // matching data-stop keys) so they read as distinct from ordinary stops, and
-  // thicken the Segments-table divider at each split: the segment row arriving
-  // at stop i is labelled "<prev> → S{i+1}", so its bottom border is the line
-  // between that stop's incoming and outgoing segments.
+  // matching data-stop="c{i}" keys) so they read as distinct from ordinary
+  // stops, and thicken the Segments-table divider at each split: the segment
+  // row arriving at stop i carries data-arrives-at="c{i}" (stamped by
+  // analysis.js), so its bottom border is the line between that stop's incoming
+  // and outgoing segments.
   // The split markings live in the timeline and the Stops/Segments tables,
   // which are siblings of this component under the analysis view — not inside
   // elRoot — so query the shared #root that hosts the whole mounted view.
@@ -516,11 +524,10 @@ export function buildMapArea(data, model) {
       root.querySelectorAll(`[data-stop="c${i}"]`).forEach((e) => e.classList.add("split-stop"));
       const cb = root.querySelector(`tr[data-stop="c${i}"] input.split-toggle`);
       if (cb) cb.checked = true;
+      root
+        .querySelectorAll(`table.segments tr.row[data-arrives-at="c${i}"]`)
+        .forEach((tr) => tr.classList.add("split-border"));
     }
-    const suffixes = splits.map((i) => `→ S${i + 1}`);
-    root.querySelectorAll("table.segments tr.row[data-seg]").forEach((tr) => {
-      if (suffixes.some((suf) => tr.dataset.seg.endsWith(suf))) tr.classList.add("split-border");
-    });
   };
 
   const render = () => {

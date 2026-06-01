@@ -38,7 +38,12 @@ function buildSectionTabs(tabs) {
   for (const t of tabs) {
     t.btn = el(
       "button",
-      { class: "btn tab-btn", type: "button", role: "tab", onclick: () => select(t) },
+      {
+        class: "btn tab-btn",
+        type: "button",
+        role: "tab",
+        onclick: () => select(t),
+      },
       t.label,
     );
     bar.appendChild(t.btn);
@@ -49,11 +54,26 @@ function buildSectionTabs(tabs) {
 }
 
 // --- timeline ----------------------------------------------------------
+// The data-stop key for a stopLabels index: "start"/"end" bookends, "c{i}" for
+// the i-th interior stop. This scheme is the contract shared with map.js (split
+// highlighting) and the timeline/table peers (linked hover).
+function stopKeyAt(index, stopCount) {
+  if (index === 0) return "start";
+  if (index === stopCount + 1) return "end";
+  return `c${index - 1}`;
+}
+
 function buildTimelineModel(stops, segments) {
   const stopLabels = ["Start", ...stops.map((_, i) => `S${i + 1}`), "End"];
   const segByLabel = Object.fromEntries(segments.map((s) => [s.label, s]));
   const segLabels = stopLabels.slice(0, -1).map((s, i) => `${s} → ${stopLabels[i + 1]}`);
   const orderedSegs = segLabels.map((l) => segByLabel[l] ?? null);
+  // Map each segment label to the data-stop key of the stop it arrives at, so
+  // consumers (map.js split borders) can target a segment row by stop key
+  // instead of parsing the human-readable "→ S{i+1}" label format.
+  const segArrivesAt = Object.fromEntries(
+    segLabels.map((l, i) => [l, stopKeyAt(i + 1, stops.length)]),
+  );
   const cumKm = [0];
   for (const s of orderedSegs) cumKm.push(cumKm[cumKm.length - 1] + (s ? s.distance_m / 1000 : 0));
   const lastSeg = orderedSegs[orderedSegs.length - 1];
@@ -62,7 +82,7 @@ function buildTimelineModel(stops, segments) {
     : orderedSegs[0]
       ? orderedSegs[0].duration_s
       : 0;
-  return { stopLabels, segLabels, orderedSegs, cumKm, endS };
+  return { stopLabels, segLabels, segArrivesAt, orderedSegs, cumKm, endS };
 }
 
 function renderTimeline(activity, stops, model) {
@@ -75,24 +95,21 @@ function renderTimeline(activity, stops, model) {
   // Build columns: stop, seg, stop, seg, ..., stop
   let col = 1;
   stopLabels.forEach((label, i) => {
+    const stopKey = stopKeyAt(i, stops.length);
     let arrive = null,
       depart = null,
-      rest = null,
-      stopKey;
+      rest = null;
     if (label === "Start") {
       depart = fmtClock(0);
       rest = 0;
-      stopKey = "start";
     } else if (label === "End") {
       arrive = fmtClock(endS);
       rest = 0;
-      stopKey = "end";
     } else {
       const c = stops[i - 1];
       arrive = fmtClock(c.time_before_s);
       depart = fmtClock(c.time_after_s);
       rest = c.rest_s;
-      stopKey = `c${i - 1}`;
     }
     const stopCol = col++;
     grid.appendChild(
@@ -116,7 +133,11 @@ function renderTimeline(activity, stops, model) {
     grid.appendChild(
       el(
         "div",
-        { class: "track-stop", style: `grid-column: ${stopCol}`, "data-stop": stopKey },
+        {
+          class: "track-stop",
+          style: `grid-column: ${stopCol}`,
+          "data-stop": stopKey,
+        },
         el("span", { class: "dot" }),
       ),
     );
@@ -215,7 +236,7 @@ function renderStopsTable(activity, stops, model, onToggleSplit) {
   );
 }
 
-function renderSegmentsTable(segments) {
+function renderSegmentsTable(segments, model) {
   return el(
     "table",
     { class: "data segments" },
@@ -244,7 +265,11 @@ function renderSegmentsTable(segments) {
       segments.map((s) =>
         el(
           "tr",
-          { class: "row", "data-seg": s.label },
+          {
+            class: "row",
+            "data-seg": s.label,
+            "data-arrives-at": model.segArrivesAt[s.label],
+          },
           el("td", {}, s.label),
           el("td", {}, fmtNum(s.distance_m / 1000, 2)),
           el("td", {}, fmtDur(s.duration_s)),
@@ -281,7 +306,10 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
   let chart = null;
   let hovering = false;
 
-  const qs = new URLSearchParams({ min_stop: minStop, merge_within_m: mergeWithinM });
+  const qs = new URLSearchParams({
+    min_stop: minStop,
+    merge_within_m: mergeWithinM,
+  });
   if (refresh) qs.set("refresh", "true");
 
   fetchJson(`/api/rides/${rideId}/analysis?${qs}`)
@@ -396,7 +424,7 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
           el("h2", {}, "Stops"),
           renderStopsTable(data.activity, data.stops, model, (i) => map && map.toggleSplit(i)),
         ),
-        el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments)),
+        el("section", {}, el("h2", {}, "Segments"), renderSegmentsTable(data.segments, model)),
       );
       const tabs = buildSectionTabs([
         { label: "Tables", panel: tablesPanel },
