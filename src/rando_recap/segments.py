@@ -65,9 +65,7 @@ def _slice_mean(values: list | None, lo: int, hi: int, *, skip_zero: bool = Fals
     return sum(nums) / len(nums)
 
 
-def temp_stats(
-    temp: list | None, lo: int, hi: int
-) -> tuple[float | None, float | None, float | None, int]:
+def temp_stats(temp: list | None, lo: int, hi: int) -> tuple[float | None, float | None, float | None, int]:
     """(mean, min, max, count) of present temperature samples in ``[lo, hi]``.
 
     All-None / missing → ``(None, None, None, 0)``. Unlike cadence/watts, 0°C is a

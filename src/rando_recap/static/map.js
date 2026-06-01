@@ -404,7 +404,13 @@ function paneSummary(segs, elapsedS) {
     "div",
     { class: "pane-summary" },
     summaryItem("Dist", fmtUnit(sum((s) => s.distance_m) / 1000, "km", 1)),
-    summaryItem("Climb", fmtUnit(sum((s) => s.climb_m), "m")),
+    summaryItem(
+      "Climb",
+      fmtUnit(
+        sum((s) => s.climb_m),
+        "m",
+      ),
+    ),
     summaryItem("Coast", fmtPct(coastFrac)),
     summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
     summaryItem("Elapsed", fmtDur(elapsedS)),

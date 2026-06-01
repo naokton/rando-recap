@@ -135,9 +135,7 @@ function renderTimeline(activity, stops, model) {
       } else {
         cell.appendChild(el("div", { class: "km" }, fmtUnit(s.distance_m / 1000, "km", 1)));
         cell.appendChild(el("div", {}, fmtDur(s.duration_s)));
-        cell.appendChild(
-          el("div", {}, `${fmtKmh(s.avg_speed_mps)} km/h`),
-        );
+        cell.appendChild(el("div", {}, `${fmtKmh(s.avg_speed_mps)} km/h`));
         cell.appendChild(el("div", {}, fmtUnit(s.avg_hr, "bpm")));
         cell.appendChild(el("div", {}, fmtUnit(s.climb_m, "m↑")));
       }
@@ -309,7 +307,11 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
         "h2",
         { class: "ride-title" },
         a.name || "(unnamed ride)",
-        el("span", { class: "date" }, `(${(a.start_date_local || a.start_date || "").slice(0, 10)})`),
+        el(
+          "span",
+          { class: "date" },
+          `(${(a.start_date_local || a.start_date || "").slice(0, 10)})`,
+        ),
         refreshBtn,
       );
 
@@ -408,7 +410,9 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
       );
     })
     .catch((e) =>
-      elRoot.replaceChildren(el("div", { class: "error" }, `Failed to load analysis: ${e.message}`)),
+      elRoot.replaceChildren(
+        el("div", { class: "error" }, `Failed to load analysis: ${e.message}`),
+      ),
     );
 
   return {
