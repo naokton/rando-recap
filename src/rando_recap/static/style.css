@@ -84,7 +84,7 @@ header a:hover {
 .config-btn::before {
   width: 20px;
   height: 20px;
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/settings.svg");
+  --icon: url("/static/vendor/lucide/settings.svg");
 }
 .config-btn:hover {
   background: var(--bg-soft);
@@ -314,7 +314,7 @@ main {
 .filter-btn::before {
   width: 18px;
   height: 18px;
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/filter.svg");
+  --icon: url("/static/vendor/lucide/filter.svg");
 }
 .filter-btn.active {
   color: var(--accent);
@@ -467,7 +467,7 @@ table.rides.merge-mode tbody tr.selected:hover {
 .refresh-btn::before {
   width: 14px;
   height: 14px;
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/refresh-cw.svg");
+  --icon: url("/static/vendor/lucide/refresh-cw.svg");
 }
 .refresh-btn:hover:not(:disabled) {
   opacity: 1;
@@ -632,16 +632,16 @@ table.rides.merge-mode tbody tr.selected:hover {
   color: var(--fg);
 }
 .dn-day {
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/sun.svg");
+  --icon: url("/static/vendor/lucide/sun.svg");
 }
 .dn-twilight {
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/haze.svg");
+  --icon: url("/static/vendor/lucide/haze.svg");
 }
 .dn-night {
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/moon.svg");
+  --icon: url("/static/vendor/lucide/moon.svg");
 }
 .dn-rest {
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/coffee.svg");
+  --icon: url("/static/vendor/lucide/coffee.svg");
 }
 
 /* Timeline */
@@ -892,10 +892,10 @@ body.map-fullscreen-active {
 .fullscreen-btn::before {
   width: 20px;
   height: 20px;
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/maximize.svg");
+  --icon: url("/static/vendor/lucide/maximize.svg");
 }
 .fullscreen-btn.is-fullscreen::before {
-  --icon: url("https://cdn.jsdelivr.net/npm/lucide-static@1.16.0/icons/minimize.svg");
+  --icon: url("/static/vendor/lucide/minimize.svg");
 }
 .map-legend {
   background: var(--bg);

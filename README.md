@@ -132,11 +132,16 @@ uv run pytest
 
 Requires Python ≥ 3.14. Frontend tooling installs via `npm install`
 (devDependencies only — there's no JS build step; `static/` is served
-as-is, and Leaflet is loaded from a CDN).
+as-is, and third-party assets like Leaflet are vendored under
+`static/vendor/`).
 
 ## License
 
 Source code is licensed under the MIT License (see [LICENSE](LICENSE)).
+
+Third-party code vendored under `src/rando_recap/static/vendor/` is distributed
+under its own license; the original license text is retained in a `LICENSE` file
+within each subdirectory.
 
 The MIT license does **not** apply to third-party trademarks or brand assets.
 The Strava name, logos, and the "Powered by Strava" / "Connect with Strava"
