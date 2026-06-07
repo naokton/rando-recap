@@ -4,7 +4,7 @@
 // timeline, and the tables each subscribe and update their own DOM. This is the
 // single source of truth that used to live in a buildMapArea closure and be
 // pushed into sibling DOM by hand.
-import { observable } from "./store.js";
+import { observable } from "./observable.js";
 
 export function createSplits() {
   const store = observable([]);

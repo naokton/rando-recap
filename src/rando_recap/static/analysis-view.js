@@ -15,12 +15,12 @@ import {
   fmtTempRange,
 } from "./utils.js";
 import { saveUserParams } from "./prefs.js";
-import { beginHover, endHover } from "./hover.js";
+import { beginHover, endHover } from "./linked-hover.js";
 import { summaryItem, summaryBar, barLegend } from "./summary.js";
 import { buildMapArea } from "./map.js";
 import { buildChart } from "./chart.js";
-import { createSplits } from "./splits.js";
-import * as ViewHost from "./viewhost.js";
+import { createSplits } from "./splits-store.js";
+import * as ViewHost from "./view-host.js";
 
 // --- section tabs ------------------------------------------------------
 // Tab bar that shows exactly one of its panels at a time. Each tab is

@@ -11,8 +11,8 @@ import {
   FETCH_WINDOWS,
   DEFAULT_MIN_DIST_KM,
 } from "./prefs.js";
-import { setHash, parseHash } from "./nav.js";
-import * as ViewHost from "./viewhost.js";
+import { setHash, parseHash } from "./url.js";
+import * as ViewHost from "./view-host.js";
 
 // Toolbar popover holding the rides-list filters (currently just minimum
 // distance). Applying routes via the hash so the list re-fetches through route().

@@ -2,7 +2,7 @@
 // — the disposable component that owns the whole map subtree (the maps, the
 // resize handle, and the per-pane summaries) and returns
 // { el, destroy, setHoverIndex }. It rebuilds its panes off the shared `splits`
-// store (splits.js). Leaflet (`L`) is a global, touched only inside functions
+// store (splits-store.js). Leaflet (`L`) is a global, touched only inside functions
 // that run after boot().
 import {
   el,
@@ -16,9 +16,9 @@ import {
   STOP_COLOR,
   DAYNIGHT_COLORS,
 } from "./utils.js";
-import { registerMapPeer, clearMapPeers } from "./hover.js";
+import { registerMapPeer, clearMapPeers } from "./linked-hover.js";
 import { summaryItem, dnRestBar, dnRestLegend } from "./summary.js";
-import { openContextMenu, closeContextMenu } from "./menu.js";
+import { openContextMenu, closeContextMenu } from "./context-menu.js";
 
 const MIN_MAP_HEIGHT_PX = 200;
 // Stop marker radius (px) by *absolute* rest duration, so a given rest length
@@ -381,7 +381,7 @@ export function buildMapArea(data, model, splits) {
   const elRoot = el("div", { class: "map-area" }, mapWrap, resizeHandle, summaryWrap);
   attachMapResizer(mapWrap, resizeHandle);
 
-  // The split points live in the shared `splits` store (see splits.js); this
+  // The split points live in the shared `splits` store (see splits-store.js); this
   // component reads them via splits.get() and rebuilds its panes whenever the
   // store changes. One entry per rendered pane: its Leaflet map, the
   // stream-index range it covers, and a lazily-created hover marker (the dot
@@ -425,7 +425,7 @@ export function buildMapArea(data, model, splits) {
   // Clicking "Split here" on a stop marker adds a split at that stop, carving
   // the route into one more pane; each split is removed via the ✕ on the pane
   // to its right. Both just mutate the shared store — the subscription below
-  // re-renders. (Toggling from the Stops-table checkbox lives in analysis.js,
+  // re-renders. (Toggling from the Stops-table checkbox lives in analysis-view.js,
   // driving the same store.)
   const onClickStop = (i) => splits.add(i);
   const removeSplit = (stopIdx) => splits.remove(stopIdx);

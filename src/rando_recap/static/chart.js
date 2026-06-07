@@ -7,8 +7,8 @@
 // plus a crosshair reads out the value under the cursor. Always whole-ride, even
 // when the map is split into panes. buildChart returns { el, destroy }.
 import { el, svgNode, makeClockFmt, fmtDur, fmtUnit, DAYNIGHT_COLORS } from "./utils.js";
-import { setHover } from "./hover.js";
-import { openContextMenu, closeContextMenu } from "./menu.js";
+import { setHover } from "./linked-hover.js";
+import { openContextMenu, closeContextMenu } from "./context-menu.js";
 import { loadUserParams, saveUserParams } from "./prefs.js";
 
 const CHART_METRICS = [

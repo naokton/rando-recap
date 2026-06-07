@@ -4,13 +4,13 @@
 // reach the host and nav directly, so the graph stays a pure DAG.
 import { root, fetchJson } from "./utils.js";
 import { saveUserParams } from "./prefs.js";
-import { parseHash } from "./nav.js";
-import * as ViewHost from "./viewhost.js";
-import { wireHover } from "./hover.js";
-import { ListView } from "./list.js";
-import { AnalysisView } from "./analysis.js";
-import { SignInView } from "./signin.js";
-import { mountConfig } from "./config.js";
+import { parseHash } from "./url.js";
+import * as ViewHost from "./view-host.js";
+import { wireHover } from "./linked-hover.js";
+import { ListView } from "./rides-view.js";
+import { AnalysisView } from "./analysis-view.js";
+import { SignInView } from "./signin-view.js";
+import { mountConfig } from "./settings.js";
 
 // Dispatch the current hash to a view. Invoked from boot()'s initial dispatch,
 // the hashchange listener, and applyConfig — never from inside a view.
@@ -63,7 +63,7 @@ export async function boot() {
   }
   // Settings are only meaningful once authenticated, so the button + dialog are
   // built and inserted here rather than living in the static shell — the
-  // sign-in screen carries no settings UI. applyConfig is passed in so config.js
+  // sign-in screen carries no settings UI. applyConfig is passed in so settings.js
   // stays oblivious to routing.
   mountConfig(applyConfig);
   window.addEventListener("hashchange", route);
