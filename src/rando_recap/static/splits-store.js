@@ -12,6 +12,7 @@ export function createSplits() {
   return {
     get: store.get,
     subscribe: store.subscribe,
+    has,
     // Idempotent — the map menu's "Split here" may fire on an existing split.
     add: (i) => {
       if (!has(i)) store.set(withSorted(i));

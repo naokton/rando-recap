@@ -230,12 +230,14 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
 
     // Rest bands across the plot, keyed for linked hover. Painted after the
     // gridlines with an opaque fill so the horizontal lines don't show through.
+    // Split points are tinted to match the timeline/table, reading split state
+    // straight off the shared store.
     stops.forEach((c, i) => {
       const x0 = xScale(c.time_before_s);
       const x1 = xScale(c.time_after_s);
       root.appendChild(
         svgNode("rect", {
-          class: "chart-rest",
+          class: splits.has(i) ? "chart-rest chart-rest-split" : "chart-rest",
           "data-stop": `c${i}`,
           x: x0,
           y: top,
@@ -357,8 +359,10 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
       tooltip.style.left = `${Math.max(0, tx)}px`;
       tooltip.style.top = `${top}px`;
     });
-    // Clicking a rest band offers "Split here" — the same action as the map's
-    // stop-marker menu, driving the shared splits store by stop index.
+    // Clicking a rest band toggles a split there, driving the shared splits store
+    // by stop index. The menu reflects current state: "Split here" on a plain
+    // rest, "Remove split" on one that's already a split point — mirroring the
+    // map's add-via-marker / remove-via-✕ model.
     overlay.addEventListener("click", (e) => {
       const rect = root.getBoundingClientRect();
       const px = Math.max(left, Math.min(e.clientX - rect.left, left + innerW));
@@ -366,7 +370,10 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
       const hit = hitAt(t);
       if (!hit || hit.kind !== "stop") return;
       const i = parseInt(hit.key.slice(1), 10);
-      openContextMenu(e, [{ label: "Split here", onSelect: () => splits.add(i) }]);
+      const item = splits.has(i)
+        ? { label: "Remove split", onSelect: () => splits.remove(i) }
+        : { label: "Split here", onSelect: () => splits.add(i) };
+      openContextMenu(e, [item]);
     });
     overlay.addEventListener("mouseleave", () => {
       cross.style.display = "none";
@@ -385,11 +392,15 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   buttons.forEach((b, i) => b.classList.toggle("active", available[i] === current));
   const ro = new ResizeObserver(() => draw());
   ro.observe(plot);
+  // Redraw when splits change anywhere (map / table / timeline) so the bands stay
+  // in sync — the chart is the shared store's last non-subscribing reader.
+  const unsub = splits.subscribe(() => draw());
 
   return {
     el: container,
     destroy: () => {
       ro.disconnect();
+      unsub();
       closeContextMenu();
       emitHoverIndex(null);
       setChartHover(null, null);

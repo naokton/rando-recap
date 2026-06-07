@@ -961,6 +961,12 @@ body.map-fullscreen-active {
 .chart-rest.hl {
   fill: var(--border-strong);
 }
+.chart-rest-split {
+  fill: color-mix(in srgb, var(--split) 40%, var(--bg));
+}
+.chart-rest-split.hl {
+  fill: var(--split);
+}
 .chart-line {
   fill: none;
   stroke: var(--segment);
