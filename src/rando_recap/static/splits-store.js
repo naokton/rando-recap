@@ -1,9 +1,8 @@
 // The route's split points as a reactive store: a sorted-ascending list of
-// interior-stop indices ([] = single-map mode). The map markers, the per-pane
-// ✕, and the Stops-table checkboxes all mutate the same store; the map, the
-// timeline, and the tables each subscribe and update their own DOM. This is the
-// single source of truth that used to live in a buildMapArea closure and be
-// pushed into sibling DOM by hand.
+// interior-stop indices ([] = single-map mode). The single source of truth for
+// splits — the map markers, the per-pane ✕, and the Stops-table checkboxes all
+// mutate it; the map, the timeline, and the tables each subscribe and update
+// their own DOM.
 import { observable } from "./observable.js";
 
 export function createSplits() {

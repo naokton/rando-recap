@@ -1,9 +1,8 @@
 // The settings button + dialog (min_stop / merge_within_m), built in JS and
 // inserted into the page chrome. mountConfig() is called from boot() only once
-// the user is authenticated, so the sign-in screen never carries settings UI —
-// the elements simply don't exist there. Closing over the created nodes also
-// frees this from getElementById lookups; the ids that remain exist only for
-// <label for> associations and the selectors style.css targets.
+// authenticated, so the sign-in screen carries no settings UI. Closing over the
+// created nodes avoids getElementById lookups; the ids that remain exist only
+// for <label for> associations and the selectors style.css targets.
 import { el } from "./utils.js";
 import {
   loadUserParams,
@@ -18,12 +17,9 @@ import {
 // onApply is the router's applyConfig: it persists the prefs and re-renders the
 // current view if it depends on them, so this module stays oblivious to routing.
 //
-// This self-appends rather than returning the { el, destroy } the views use.
-// That contract is for swappable views ViewHost mounts inside #root and tears
-// down on every navigation; the settings button + dialog are persistent chrome
-// that must outlive those swaps, so they live outside #root (as they did when
-// they were static markup) and are never destroyed — a destroy() hook would be
-// dead code with no caller.
+// This self-appends rather than returning the { el, destroy } views use: the
+// button + dialog are persistent chrome living outside #root, never torn down,
+// so a destroy() hook would be dead code.
 export function mountConfig(onApply) {
   const minStopH = el("input", {
     id: "cfg-min-stop-h",

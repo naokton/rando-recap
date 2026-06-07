@@ -53,9 +53,8 @@ export function el(tag, attrs = {}, ...children) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (k === "class") e.className = v;
-    // Any on* key whose value is a function binds that event listener, so
-    // handlers declare inline alongside the element instead of a trailing
-    // addEventListener (onclick, onsubmit, onchange, …).
+    // An on* key with a function value binds an event listener inline (onclick,
+    // onsubmit, onchange, …).
     else if (k.startsWith("on") && typeof v === "function")
       e.addEventListener(k.slice(2).toLowerCase(), v);
     else if (v !== false && v != null) e.setAttribute(k, v);
@@ -97,8 +96,8 @@ export async function fetchJson(url) {
 
 // --- color palette -----------------------------------------------------
 // Map colors live in style.css (:root) so the palette has one home; Leaflet
-// can't read CSS vars itself, so we resolve them once at load. The stylesheet
-// is <link>ed in <head> before this module runs, so the values are available.
+// can't read CSS vars, so resolve them once at load. The stylesheet is <link>ed
+// in <head> before this module runs, so the values are available.
 const cssVar = (() => {
   const rootStyle = getComputedStyle(document.documentElement);
   return (name) => rootStyle.getPropertyValue(name).trim();

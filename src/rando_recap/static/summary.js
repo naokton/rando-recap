@@ -24,12 +24,11 @@ function dnRestParts(a) {
   ];
 }
 
-// Horizontal stacked bar visualizing how an Elapsed time divides into moving
-// (day/twilight/night) and rest. Takes normalized [key, label, seconds] parts so
-// the whole-ride summary and the per-pane summaries can share one bar. Segment
-// widths are proportional (flex-grow); each shows its day/night glyph (reusing
-// the `dn-*` icons) and share inline, clipped on segments too narrow to fit,
-// with a tooltip label.
+// Horizontal stacked bar showing how an Elapsed time divides into moving
+// (day/twilight/night) and rest. Takes [key, label, seconds] parts so the
+// whole-ride and per-pane summaries share one bar. Segment widths are
+// proportional (flex-grow); each shows its `dn-*` glyph and share inline, with a
+// tooltip label.
 export function dnRestBar(parts) {
   const total = parts.reduce((acc, [, , v]) => acc + v, 0);
   if (total <= 0) return null;
@@ -53,9 +52,8 @@ export function dnRestBar(parts) {
   );
 }
 
-// Durations for the bar's four segments, color-matched to the bar — the exact
-// day/twilight/night/rest times, read as the bar's own legend. Glyph + duration
-// only; the segment name is conveyed by the glyph (and the bar's own tooltip).
+// The bar's legend: glyph + exact duration for each of the four segments. The
+// segment name is conveyed by the glyph (and the bar's tooltip).
 export function dnRestLegend(parts) {
   return el(
     "div",

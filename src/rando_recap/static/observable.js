@@ -1,11 +1,10 @@
-// A minimal observable: a value, a set of subscribers, and a notify on change.
-// The irreducible core of a reactive store (Pinia/Zustand/Redux) without the
-// framework — enough for one view's worth of shared state.
+// A minimal observable: a value, its subscribers, and a notify on change —
+// enough shared reactive state for one view, without a framework.
 //
 // subscribe() fires immediately so a fresh subscriber paints the current value,
-// then again on every set(); it returns an unsubscribe the owner calls on
-// teardown. State is view-scoped: create one per view, drop it with the view,
-// and the subscriber closures (which hold DOM references) go with it.
+// then again on every set(); it returns an unsubscribe for teardown. State is
+// view-scoped: create one per view and drop it with the view, so the subscriber
+// closures (which hold DOM references) go too.
 export function observable(initial) {
   let value = initial;
   const subs = new Set();

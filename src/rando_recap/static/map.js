@@ -1,9 +1,8 @@
-// Leaflet drawing, the map controls, and buildMapArea
-// — the disposable component that owns the whole map subtree (the maps, the
-// resize handle, and the per-pane summaries) and returns
-// { el, destroy, setHoverIndex }. It rebuilds its panes off the shared `splits`
-// store (splits-store.js). Leaflet (`L`) is a global, touched only inside functions
-// that run after boot().
+// Leaflet drawing, the map controls, and buildMapArea — the disposable component
+// that owns the whole map subtree (the maps, the resize handle, and the per-pane
+// summaries) and returns { el, destroy, setHoverIndex }. It rebuilds its panes
+// off the shared `splits` store (splits-store.js). Leaflet (`L`) is a global,
+// touched only inside functions that run after boot().
 import {
   el,
   fmtDur,
@@ -21,10 +20,10 @@ import { summaryItem, dnRestBar, dnRestLegend } from "./summary.js";
 import { openContextMenu, closeContextMenu } from "./context-menu.js";
 
 const MIN_MAP_HEIGHT_PX = 200;
-// Stop marker radius (px) by *absolute* rest duration, so a given rest length
+// Stop marker radius (px) by absolute rest duration, so a given rest length
 // looks the same size across rides. [rest_seconds, radius] anchors are
 // interpolated linearly; the last anchor (6h→40px) is the max, and anything
-// longer caps at 40px.
+// longer caps there.
 const STOP_MARKER_ANCHORS = [
   [0, 6], // very short rests (a few seconds): minimum size
   [1800, 15], // 30 minutes
@@ -109,10 +108,10 @@ function drawSegmentLines(map, latlng, segments, hasDaynight, range) {
   return lines;
 }
 
-// A teardrop pin: "start" role (start / split departure) labeled
-// S, "end" role (end / split arrival) labeled E. The tip is anchored to the
-// geographic point; tooltipAnchor lifts hover tooltips clear of the head. CSS
-// lives in style.css (.map-pin).
+// A teardrop pin: "start" role (start / split departure) labeled S, "end" role
+// (end / split arrival) labeled E. The tip is anchored to the geographic point;
+// tooltipAnchor lifts tooltips clear of the head. CSS lives in style.css
+// (.map-pin).
 function pinIcon(role) {
   const label = role === "start" ? "S" : "E";
   return L.divIcon({
@@ -187,8 +186,8 @@ function drawStopMarkers(map, stops, range, onClickStop, startSplitStop, endSpli
     });
   if (!visible.length) return null;
   // Render largest circles first so smaller ones land on top — when stops
-  // cluster at the same place, the smaller circle stays hoverable instead of
-  // being buried under the larger one.
+  // cluster, the smaller circle stays hoverable instead of being buried under
+  // the larger one.
   const ordered = visible
     .map(({ c, i }) => ({ c, i, radius: stopMarkerRadius(c.rest_s) }))
     .sort((a, b) => b.radius - a.radius);
@@ -357,18 +356,14 @@ function paneSummary(segs, elapsedS) {
     summaryItem("Temp", fmtTempRange(tempAvg, tempMin, tempMax)),
     summaryItem("Elapsed", fmtDur(elapsedS)),
     summaryItem("Moving", fmtDur(movingS)),
-    // Stacked bar + its day/twilight/night/rest legend, in the same order and
-    // shape as the whole-ride summary's bar + legend, scoped to this pane.
+    // Stacked bar + its day/twilight/night/rest legend, scoped to this pane.
     dnRestBar(dnParts),
     dnRestLegend(dnParts),
   );
 }
 
-// Disposable map component. Owns its whole subtree — the maps (#map), the
-// resize handle, and the per-pane summaries — under one wrapper returned as
-// `el`. The handle resizes only #map (as before). destroy() removes every
-// Leaflet map, closes any open marker menu, and clears the hover peers it
-// registered.
+// Disposable map component. destroy() removes every Leaflet map, closes any open
+// marker menu, and clears the hover peers it registered.
 export function buildMapArea(data, model, splits) {
   // Maps live in #map (the only thing the drag handle resizes); the per-pane
   // summaries live in a matching column row below the handle.
@@ -381,11 +376,10 @@ export function buildMapArea(data, model, splits) {
   const elRoot = el("div", { class: "map-area" }, mapWrap, resizeHandle, summaryWrap);
   attachMapResizer(mapWrap, resizeHandle);
 
-  // The split points live in the shared `splits` store (see splits-store.js); this
-  // component reads them via splits.get() and rebuilds its panes whenever the
-  // store changes. One entry per rendered pane: its Leaflet map, the
-  // stream-index range it covers, and a lazily-created hover marker (the dot
-  // synced to the chart).
+  // The split points live in the shared `splits` store (splits-store.js); this
+  // component reads them via splits.get() and rebuilds its panes on every store
+  // change. One entry per rendered pane: its Leaflet map, the stream-index range
+  // it covers, and a lazily-created hover marker (the dot synced to the chart).
   let panesRendered = [];
 
   const teardown = () => {
@@ -423,10 +417,9 @@ export function buildMapArea(data, model, splits) {
   };
 
   // Clicking "Split here" on a stop marker adds a split at that stop, carving
-  // the route into one more pane; each split is removed via the ✕ on the pane
-  // to its right. Both just mutate the shared store — the subscription below
-  // re-renders. (Toggling from the Stops-table checkbox lives in analysis-view.js,
-  // driving the same store.)
+  // out one more pane; each split is removed via the ✕ on the pane to its right.
+  // Both mutate the shared store — the subscription below re-renders. (The
+  // Stops-table checkbox in analysis-view.js drives the same store.)
   const onClickStop = (i) => splits.add(i);
   const removeSplit = (stopIdx) => splits.remove(stopIdx);
 
@@ -473,9 +466,7 @@ export function buildMapArea(data, model, splits) {
     const isSplit = cur.length > 0;
     summaryWrap.classList.toggle("split", isSplit);
     // Single-map mode keeps the whole-ride summary up top; only split panes get
-    // their own summary. Maps live in #map (the only thing the drag handle
-    // resizes); the per-pane summaries live in a matching column row below the
-    // handle.
+    // their own summary.
     const inners = panes.map((p) => {
       const d = el("div", { class: "leaflet-map" });
       mapWrap.appendChild(d);

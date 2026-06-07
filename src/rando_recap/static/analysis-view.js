@@ -82,7 +82,7 @@ function buildTimelineModel(stops, segments) {
   const orderedSegs = segLabels.map((l) => segByLabel[l] ?? null);
   // Map each segment label to the data-stop key of the stop it arrives at, so
   // consumers (map.js split borders) can target a segment row by stop key
-  // instead of parsing the human-readable "→ S{i+1}" label format.
+  // instead of parsing the "→ S{i+1}" label.
   const segArrivesAt = Object.fromEntries(
     segLabels.map((l, i) => [l, stopKeyAt(i + 1, stops.length)]),
   );
@@ -201,10 +201,10 @@ function renderStopsTable(activity, stops, model, splits) {
       el("td", {}, rest),
       el("td", { class: "split-cell" }, splitCell),
     );
-  // Only the interior stops are splittable; the Start/End bookends get an empty
-  // cell. The checkbox just toggles the shared splits store (single source of
-  // truth); the subscription below re-derives every checkbox's checked state,
-  // so a split added elsewhere (map menu, pane ✕) flows back here.
+  // Only interior stops are splittable; the Start/End bookends get an empty
+  // cell. The checkbox toggles the shared splits store; the subscription below
+  // re-derives every checkbox's checked state, so a split added elsewhere (map
+  // menu, pane ✕) flows back here.
   const splitToggle = (i) =>
     el("input", {
       type: "checkbox",
@@ -248,7 +248,7 @@ function renderStopsTable(activity, stops, model, splits) {
       row("end", "End", fmtNum(cumKm[cumKm.length - 1], 1), fmtClock(endS), "-", "-", null),
     ),
   );
-  // Own our own marks: highlight split rows and re-derive each checkbox.
+  // Highlight split rows and re-derive each checkbox.
   const unsub = splits.subscribe((cur) => {
     markSplitStops(table, cur);
     const set = new Set(cur);
@@ -321,11 +321,11 @@ function renderSegmentsTable(segments, model, splits) {
 }
 
 // --- analysis view -----------------------------------------------------
-// `refresh` is a one-shot: when true we ask the backend to re-fetch this ride's
-// streams from Strava (costs an API call). It is deliberately NOT persisted to
-// user-params and NOT carried in the URL hash — a reload or back-nav must reload
-// from cache, never silently re-spend quota. The refresh button just re-shows a
-// fresh AnalysisView with it set; the next route() drops back to refresh=false.
+// `refresh` is a one-shot: when true, ask the backend to re-fetch this ride's
+// streams from Strava (costs an API call). It's neither persisted to user-params
+// nor carried in the URL hash — a reload or back-nav must reload from cache,
+// never silently re-spend quota. The refresh button re-shows a fresh
+// AnalysisView with it set; the next route() drops back to refresh=false.
 export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
   saveUserParams({ minStop, mergeWithinM });
   // `el` now, fill later: return a placeholder synchronously and replaceChildren
@@ -357,8 +357,8 @@ export function AnalysisView(rideId, minStop, mergeWithinM, refresh = false) {
 
       const a = data.activity;
       const model = buildTimelineModel(data.stops, data.segments);
-      // Shared split state: the map, the timeline, and the tables all read and
-      // mutate this one store rather than reaching into each other's DOM.
+      // Shared split state (see splits-store.js): the map, timeline, and tables
+      // all read and mutate this one store.
       const splits = createSplits();
 
       // Re-fetch this ride's streams from Strava — a re-render in place, so the

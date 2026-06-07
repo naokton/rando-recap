@@ -66,9 +66,9 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   if (!available.length) return null;
   let current = available.find((m) => m.id === loadUserParams().chartMetric) || available[0];
 
-  // Index runs between stops — each is one segment's worth of contiguous,
-  // gap-free samples. Run i lines up with model.segLabels[i], so the line drawn
-  // for it can carry the same data-seg key the tables/timeline/map use.
+  // Index runs between stops — each one segment's worth of contiguous, gap-free
+  // samples. Run i lines up with model.segLabels[i], so its line can carry the
+  // same data-seg key the tables/timeline/map use.
   const runs = [];
   let lo = 0;
   for (const c of stops) {
@@ -134,10 +134,8 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     if (kind && key != null) setHover(kind, key);
   };
 
-  // Drive the synced map dot, mirroring setChartHover's early-return guard so a
-  // rest-band sweep (every mousemove there yields null) or any repeated
-  // identical event collapses to a single dispatch instead of re-running the
-  // per-pane marker update each time.
+  // Drive the synced map dot, de-duping identical indices so a rest-band sweep
+  // (every mousemove yields null) doesn't re-run the per-pane marker update.
   let lastHoverIdx;
   const emitHoverIndex = (idx) => {
     if (idx === lastHoverIdx) return;
@@ -196,9 +194,9 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     });
 
     // Twilight / night ribbon along the time axis, just below the plot — solid
-    // colors (a standalone strip, not a background wash). Day is left blank
-    // (transparent) so only the darker periods stand out. Bands are time-based
-    // (`lighting`), so twilight/night that falls inside a rest still shows.
+    // colors, not a background wash. Day is left transparent so only the darker
+    // periods stand out. Bands are time-based (`lighting`), so twilight/night
+    // inside a rest still shows.
     for (const s of lighting) {
       if (s.state === "day") continue;
       const x0 = xScale(s.start_s);
@@ -251,7 +249,7 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     const maxXTicks = Math.max(3, Math.floor(innerW / 90));
     const xStep =
       CHART_X_STEPS.find((s) => tEnd / s <= maxXTicks) || CHART_X_STEPS[CHART_X_STEPS.length - 1];
-    // No tick stubs below the axis — the ribbon now abuts it; labels sit below.
+    // No tick stubs below the axis — the ribbon abuts it; labels sit below.
     for (let t = 0; t <= tEnd + 1; t += xStep) {
       root.appendChild(
         svgNode(

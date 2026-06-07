@@ -20,13 +20,11 @@ function route() {
   else ViewHost.show(ListView(r.minDist));
 }
 
-// Persist app config (min_stop / merge_within_m) and re-render if the view in
-// front of the user derives from it. These prefs live in localStorage, not the
-// URL, so a change can't ride the hashchange event — the router refreshes
-// explicitly. Only the analysis view consumes them; the list reads none, so
-// it's left untouched (no needless re-fetch, transient merge-mode state kept).
-// Keeping this here means the config dialog doesn't have to know which view is
-// mounted or which fields matter.
+// Persist app config (min_stop / merge_within_m) and re-render if the current
+// view derives from it. These prefs live in localStorage, not the URL, so a
+// change can't ride the hashchange event — the router refreshes explicitly.
+// Only the analysis view consumes them; the list is left untouched to avoid a
+// needless re-fetch and keep transient merge-mode state.
 function applyConfig(partial) {
   const before = parseHash();
   saveUserParams(partial);
@@ -44,17 +42,16 @@ function applyConfig(partial) {
 // callback redirects back to "/", so a fresh load re-runs boot() and lands on
 // the normal view once authenticated.
 export async function boot() {
-  // Hover delegation lives on the persistent #root and is wiring-only (no side
-  // effects until a view populates the DOM it delegates over), so it's wired
-  // before the unauthenticated early-return.
+  // Hover delegation is wiring-only (no side effects until a view populates the
+  // DOM), so it's wired before the unauthenticated early-return.
   wireHover(root);
 
   let status;
   try {
     status = await fetchJson("/api/auth/status");
   } catch {
-    // If the status probe itself fails, fall through to normal routing so
-    // the per-view error handling can surface what went wrong.
+    // If the status probe fails, fall through to normal routing so the per-view
+    // error handling can surface what went wrong.
     status = { configured: true, authenticated: true };
   }
   if (!status.authenticated) {
@@ -62,9 +59,7 @@ export async function boot() {
     return;
   }
   // Settings are only meaningful once authenticated, so the button + dialog are
-  // built and inserted here rather than living in the static shell — the
-  // sign-in screen carries no settings UI. applyConfig is passed in so settings.js
-  // stays oblivious to routing.
+  // built here rather than in the static shell.
   mountConfig(applyConfig);
   window.addEventListener("hashchange", route);
   route();

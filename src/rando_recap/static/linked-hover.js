@@ -1,18 +1,18 @@
 // --- linked hover/highlight --------------------------------------------
-// Stops and segments appear on the map, timeline, and tables. Hovering one
-// peer highlights the others. DOM peers carry data-stop / data-seg keys
-// (stops: "start" / "end" / "c<i>"; segments: the label string). Map peers
-// (stop markers and segment polylines) register a highlight callback in
-// link.<kind>.peers via registerMapPeer.
+// Stops and segments appear on the map, timeline, and tables; hovering one peer
+// highlights the others. DOM peers carry data-stop / data-seg keys (stops:
+// "start" / "end" / "c<i>"; segments: the label string). Map peers (stop
+// markers and segment polylines) register a highlight callback via
+// registerMapPeer.
 //
-// peers is keyed by (stop/seg) key with an array of fns: in split-map mode
-// the same segment can appear on both halves (the spanning segment) and the
-// snap stop's marker is shown on both maps, so a key may have >1 peer.
+// peers maps each key to an array of fns: in split-map mode the same segment can
+// appear on both halves and a split stop's marker shows on both maps, so a key
+// may have >1 peer.
 //
-// `link` is owned here and reachable only through these functions. It is set
+// `link` is owned here and reachable only through these functions. It's set
 // while an analysis view is mounted (beginHover) and cleared on teardown
-// (endHover); every entry point no-ops when it is null, so peers registered by
-// a stale/detached view are inert.
+// (endHover); every entry point no-ops when null, so peers from a stale view are
+// inert.
 import { root } from "./utils.js";
 
 let link = null;
@@ -27,7 +27,7 @@ function makeLink() {
 
 // Begin/end the linked-hover session. The analysis view calls beginHover once
 // its data resolves (so peers have something to register against) and endHover
-// from its destroy.
+// from destroy.
 export function beginHover() {
   link = makeLink();
 }

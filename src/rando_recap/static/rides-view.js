@@ -176,9 +176,9 @@ async function streamFetch(since, signal, { onProgress, onDone, onError }) {
   }
 }
 
-// Full-screen progress view shown while a fetch runs: a live log mirroring the
-// old CLI output, running counts, and a "Back to rides" exit that re-renders the
-// list (so freshly fetched rides show). Aborts the stream on destroy.
+// Full-screen progress view shown while a fetch runs: a live log, running
+// counts, and a "Back to rides" exit that re-renders the list (so freshly
+// fetched rides show). Aborts the stream on destroy.
 export function FetchView(since) {
   const counts = el("div", { class: "fetch-counts" });
   const log = el("div", { class: "fetch-log" });
@@ -210,8 +210,8 @@ export function FetchView(since) {
   };
   const showBack = () => {
     // The fetch view never changed the hash, so it still encodes the list. A
-    // fresh ListView for that hash re-renders the (now repopulated) list — a
-    // re-render in place, so it goes through ViewHost, not a hash navigation.
+    // fresh ListView for that hash re-renders the (repopulated) list — in place
+    // via ViewHost, not a hash navigation.
     footer.appendChild(
       el(
         "button",

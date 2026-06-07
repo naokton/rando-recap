@@ -8,7 +8,7 @@ const DEFAULT_FETCH_SINCE = "1m";
 const DEFAULT_CHART_METRIC = "elevation";
 const STORAGE_KEY_USER_PARAMS = "rando-recap.user-params";
 // Windows offered by the Fetch popover; values are what the API's `since` param
-// accepts (Nd/Nw/Nm/Ny or 'all'). Labels are user-facing.
+// accepts (Nd/Nw/Nm/Ny or 'all').
 export const FETCH_WINDOWS = [
   { value: "1w", label: "Last week" },
   { value: "1m", label: "Last month" },
@@ -53,8 +53,8 @@ export function parseFetchSince(s) {
 }
 
 // Persisted UI preferences so they survive list → analysis → list navigation
-// and reloads. The URL hash still carries authoritative state when present;
-// these values fill in defaults when params are absent (e.g. on `#`).
+// and reloads. The URL hash carries authoritative state when present; these
+// fill in defaults when params are absent (e.g. on `#`).
 export function loadUserParams() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_USER_PARAMS);
