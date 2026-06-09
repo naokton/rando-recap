@@ -3,6 +3,7 @@
   --muted: #6b7280;
   --border: #e5e7eb;
   --border-strong: #babfca;
+  --hatch-stripe: #c4c4c4; /* faint neutral gray for resting rest-band hatch stripes */
   --accent: #047857;
   --accent-hover: #036648;
   --bg: white;
@@ -951,21 +952,63 @@ body.map-fullscreen-active {
 .chart-ribbon {
   pointer-events: none;
 }
-/* Rest spans: faint stop-colored fill, brighter when their stop is hovered. */
-/* Opaque gray fills so the band covers the gridlines it's painted over instead
-   of letting them show through. */
+/* Rest spans: a white-backed diagonal hatch so they read distinctly from the
+   gray terrain fill and the band covers the gridlines it's painted over.
+   Split points override with a stop-colored fill; both brighten on hover. */
 .chart-rest {
-  fill: var(--border);
+  fill: url(#chart-hatch);
   pointer-events: none;
 }
 .chart-rest.hl {
-  fill: var(--border-strong);
+  fill: url(#chart-hatch-hl);
 }
 .chart-rest-split {
-  fill: color-mix(in srgb, var(--split) 40%, var(--bg));
+  fill: url(#chart-hatch-split);
 }
 .chart-rest-split.hl {
+  fill: url(#chart-hatch-split-hl);
+}
+/* Rest-band hatch tiles + stripes (referenced via url(#chart-hatch*)). Colors
+   live here so they track the theme. Each variant pairs an opaque tile with a
+   contrasting stripe; the hover tile stays light since the resting tile is white. */
+.chart-hatch-stripe {
+  stroke-width: 2;
+}
+.chart-hatch-tile.chart-hatch-rest {
+  fill: var(--bg);
+}
+.chart-hatch-stripe.chart-hatch-rest {
+  stroke: var(--hatch-stripe);
+}
+.chart-hatch-tile.chart-hatch-hover {
+  fill: color-mix(in srgb, var(--border-strong) 70%, var(--bg));
+}
+.chart-hatch-stripe.chart-hatch-hover {
+  stroke: var(--bg);
+}
+.chart-hatch-tile.chart-hatch-split {
+  fill: color-mix(in srgb, var(--split) 40%, var(--bg));
+}
+.chart-hatch-stripe.chart-hatch-split {
+  stroke: var(--split);
+}
+.chart-hatch-tile.chart-hatch-split-hover {
   fill: var(--split);
+}
+.chart-hatch-stripe.chart-hatch-split-hover {
+  stroke: var(--bg);
+}
+/* Elevation terrain reference: a faint gray filled area drawn behind every
+   metric's line, on its own bottom-anchored scale (no axis or labels). */
+.chart-elev {
+  fill: color-mix(in srgb, var(--muted) 14%, transparent);
+  pointer-events: none;
+}
+/* Vertical edges bounding each rest band's left and right sides. */
+.chart-rest-edge {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  pointer-events: none;
 }
 .chart-line {
   fill: none;

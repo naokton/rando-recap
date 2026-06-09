@@ -36,6 +36,21 @@ export function fmtTempRange(avg, min, max) {
   return a;
 }
 
+// --- numeric helpers ---------------------------------------------------
+// Min/max of an array, skipping null/undefined, folded in one pass. A spread
+// (Math.min(...arr)) would overflow the call stack on long rides. Returns
+// [Infinity, -Infinity] when no real samples are present.
+export function extent(arr) {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const v of arr) {
+    if (v == null) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+  }
+  return [min, max];
+}
+
 export function makeClockFmt(startIso, utcOffsetS) {
   // start_date is UTC ISO; show clock in the activity's local tz (= utc_offset).
   const startMs = Date.parse(startIso);

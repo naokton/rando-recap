@@ -6,7 +6,7 @@
 // highlights its span here (and vice versa) via the shared linked-hover keys,
 // plus a crosshair reads out the value under the cursor. Always whole-ride, even
 // when the map is split into panes. buildChart returns { el, destroy }.
-import { el, svgNode, makeClockFmt, fmtDur, fmtUnit, DAYNIGHT_COLORS } from "./utils.js";
+import { el, svgNode, makeClockFmt, fmtDur, fmtUnit, extent, DAYNIGHT_COLORS } from "./utils.js";
 import { setHover } from "./linked-hover.js";
 import { openContextMenu, closeContextMenu } from "./context-menu.js";
 import { loadUserParams, saveUserParams } from "./prefs.js";
@@ -72,6 +72,14 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   );
   if (!available.length) return null;
   let current = available.find((m) => m.id === loadUserParams().chartMetric) || available[0];
+
+  // Elevation terrain background: a faint gray area drawn behind every metric's
+  // line as a visual reference. It carries its own bottom-anchored scale —
+  // independent of the active metric's y-axis — and shows no axis or labels.
+  // Its extent depends only on the stream, so fold it once here.
+  const elevSeries = Array.isArray(series.elevation) ? series.elevation : null;
+  const [elevMin, elevMax] = elevSeries ? extent(elevSeries) : [Infinity, -Infinity];
+  const hasElev = elevSeries && elevMin <= elevMax;
 
   // Index runs between stops — each one segment's worth of contiguous, gap-free
   // samples. Run i lines up with model.segLabels[i], so its line can carry the
@@ -160,15 +168,7 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   const useMetric = (m) => {
     current = m;
     scaled = series[m.id].map((v) => (v == null ? null : v * m.scale));
-    // Spread (Math.min(...)) would overflow the call stack on long rides, so
-    // fold the extent in one pass.
-    let loV = Infinity;
-    let hiV = -Infinity;
-    for (const v of scaled) {
-      if (v == null) continue;
-      if (v < loV) loV = v;
-      if (v > hiV) hiV = v;
-    }
+    const [loV, hiV] = extent(scaled);
     ({ ticks: yTicks, min: yMin, max: yMax } = niceTicks(loV, hiV));
   };
   useMetric(current);
@@ -192,12 +192,64 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     const xScale = (t) => left + (t / tEnd) * innerW;
     const yScale = (v) => top + (1 - (v - yMin) / (yMax - yMin || 1)) * innerH;
 
+    // Build one path-`d` per segment run, breaking the pen at null samples so the
+    // path splits across rests. With a `baseline` y each sub-path is sealed down
+    // to it as a closed filled area (terrain fill); without one it stays an open
+    // polyline (metric line). `sampleAt` reads the value for a sample index and
+    // `yFn` maps it to a y coordinate.
+    const runPaths = (sampleAt, yFn, baseline) =>
+      runs.map(([a, b]) => {
+        let d = "";
+        let penX = null; // x of the last drawn point while the pen is down, else null
+        for (let j = a; j <= b; j++) {
+          const v = sampleAt(j);
+          if (v == null) {
+            if (penX != null && baseline != null) d += `L${penX} ${baseline} Z `;
+            penX = null;
+            continue;
+          }
+          const x = xScale(time[j]).toFixed(1);
+          const y = yFn(v).toFixed(1);
+          if (penX != null) d += `L${x} ${y} `;
+          else d += baseline != null ? `M${x} ${baseline} L${x} ${y} ` : `M${x} ${y} `;
+          penX = x;
+        }
+        if (penX != null && baseline != null) d += `L${penX} ${baseline} Z `;
+        return d;
+      });
+
     const root = svgNode("svg", {
       class: "chart-svg",
       width: W,
       height: chartH,
       viewBox: `0 0 ${W} ${chartH}`,
     });
+
+    // Diagonal hatch for rest bands: an opaque tile (so the y-grid is hidden
+    // behind it) crossed by stripes. Two variants — a light tile for the resting
+    // state and a gray tile for the hovered state — so a hover recolors the
+    // background while keeping the hatch. Tile/stripe colors live in CSS (classes
+    // on the pattern children) so they track the theme tokens.
+    const defs = svgNode("defs");
+    const hatchPattern = (id, variant) => {
+      const p = svgNode("pattern", {
+        id,
+        width: 6,
+        height: 6,
+        patternUnits: "userSpaceOnUse",
+        patternTransform: "rotate(45)",
+      });
+      p.appendChild(svgNode("rect", { class: `chart-hatch-tile ${variant}`, width: 6, height: 6 }));
+      p.appendChild(
+        svgNode("line", { class: `chart-hatch-stripe ${variant}`, x1: 0, y1: 0, x2: 0, y2: 6 }),
+      );
+      return p;
+    };
+    defs.appendChild(hatchPattern("chart-hatch", "chart-hatch-rest"));
+    defs.appendChild(hatchPattern("chart-hatch-hl", "chart-hatch-hover"));
+    defs.appendChild(hatchPattern("chart-hatch-split", "chart-hatch-split"));
+    defs.appendChild(hatchPattern("chart-hatch-split-hl", "chart-hatch-split-hover"));
+    root.appendChild(defs);
 
     // Twilight / night ribbon along the time axis, just below the plot — solid
     // colors, not a background wash. Day is left transparent so only the darker
@@ -217,6 +269,17 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
           fill: DAYNIGHT_COLORS[s.state] || "#999",
         }),
       );
+    }
+
+    // Elevation terrain background, one filled area per segment run so it breaks
+    // across rests like the metric line. Its own scale anchors the minimum to the
+    // plot bottom and the maximum to the plot top; null samples break the fill.
+    // Skipped on the Elevation tab itself, where the line already shows the terrain.
+    if (hasElev && current.id !== "elevation") {
+      const elevY = (v) => plotBottom - ((v - elevMin) / (elevMax - elevMin || 1)) * innerH;
+      runPaths((j) => elevSeries[j], elevY, plotBottom).forEach((d) => {
+        if (d) root.appendChild(svgNode("path", { class: "chart-elev", d }));
+      });
     }
 
     // Y gridlines + labels. niceTicks bounds every tick to [yMin, yMax].
@@ -241,16 +304,22 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     stops.forEach((c, i) => {
       const x0 = xScale(c.time_before_s);
       const x1 = xScale(c.time_after_s);
+      const w = Math.max(1, x1 - x0);
       root.appendChild(
         svgNode("rect", {
           class: splits.has(i) ? "chart-rest chart-rest-split" : "chart-rest",
           "data-stop": `c${i}`,
           x: x0,
           y: top,
-          width: Math.max(1, x1 - x0),
+          width: w,
           height: innerH,
         }),
       );
+      // Vertical edges on both sides so each band reads as a bounded interval.
+      for (const ex of [x0, x0 + w])
+        root.appendChild(
+          svgNode("line", { class: "chart-rest-edge", x1: ex, y1: top, x2: ex, y2: top + innerH }),
+        );
     });
 
     // X (time) ticks, labeled as clock time in the ride's local zone.
@@ -270,18 +339,7 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
 
     // Metric line, one path per segment run so it breaks across rests and
     // carries the segment's hover key. Null samples within a run break the pen.
-    runs.forEach(([a, b], i) => {
-      let d = "";
-      let pen = false;
-      for (let j = a; j <= b; j++) {
-        const v = scaled[j];
-        if (v == null) {
-          pen = false;
-          continue;
-        }
-        d += `${pen ? "L" : "M"}${xScale(time[j]).toFixed(1)} ${yScale(v).toFixed(1)} `;
-        pen = true;
-      }
+    runPaths((j) => scaled[j], yScale).forEach((d, i) => {
       if (d)
         root.appendChild(
           svgNode("path", { class: "chart-line", "data-seg": model.segLabels[i], d }),
