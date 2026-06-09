@@ -23,7 +23,7 @@ const CHART_HEIGHT = 201;
 // The bottom margin holds the x-axis labels below the plot; left holds the y
 // labels. When a day/night ribbon is shown it sits between the two, so its
 // height is added to both the margin and the chart height in draw().
-const CHART_MARGIN = { top: 14, right: 14, bottom: 29, left: 46 };
+const CHART_MARGIN = { top: 14, right: 14, bottom: 24, left: 46 };
 const CHART_RIBBON_H = 9; // day/night ribbon thickness, in px
 
 // Round a span to a "nice" tick step (1/2/5 × 10ⁿ) for axis ticks.
