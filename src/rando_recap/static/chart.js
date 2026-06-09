@@ -19,10 +19,11 @@ const CHART_METRICS = [
   { id: "cadence", label: "Cadence", unit: "rpm", digits: 0, scale: 1 },
   { id: "temperature", label: "Temp", unit: "°C", digits: 0, scale: 1 },
 ];
-const CHART_HEIGHT = 210;
-// The bottom margin holds the day/night ribbon and the x-axis labels stacked
-// below the plot; left holds the y labels.
-const CHART_MARGIN = { top: 14, right: 14, bottom: 38, left: 46 };
+const CHART_HEIGHT = 201;
+// The bottom margin holds the x-axis labels below the plot; left holds the y
+// labels. When a day/night ribbon is shown it sits between the two, so its
+// height is added to both the margin and the chart height in draw().
+const CHART_MARGIN = { top: 14, right: 14, bottom: 29, left: 46 };
 const CHART_RIBBON_H = 9; // day/night ribbon thickness, in px
 
 // Round a span to a "nice" tick step (1/2/5 × 10ⁿ) for axis ticks.
@@ -54,6 +55,12 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   if (!series || !Array.isArray(series.time) || series.time.length < 2) return null;
   const { activity, stops, segments } = data;
   const lighting = data.lighting || [];
+  // All-daytime rides draw no ribbon and the layout constants assume that no-ribbon case.
+  // When a ribbon is shown its height is added to both the chart height and the bottom
+  // margin so it slots in below the axis without shifting the plot or labels.
+  const ribbonAdd = lighting.some((s) => s.state !== "day") ? CHART_RIBBON_H : 0;
+  const chartH = CHART_HEIGHT + ribbonAdd;
+  const chartBottom = CHART_MARGIN.bottom + ribbonAdd;
   const time = series.time;
   const n = time.length;
   const tEnd = time[n - 1] || 1;
@@ -177,10 +184,9 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
   function draw() {
     const W = plot.clientWidth;
     if (W < 80) return; // not laid out yet; the ResizeObserver will call back
-    const H = CHART_HEIGHT;
-    const { top, right, bottom, left } = CHART_MARGIN;
+    const { top, right, left } = CHART_MARGIN;
     const innerW = W - left - right;
-    const innerH = H - top - bottom;
+    const innerH = chartH - top - chartBottom;
     const plotBottom = top + innerH;
     const ribbonY = plotBottom; // day/night ribbon sits flush under the x-axis
     const xScale = (t) => left + (t / tEnd) * innerW;
@@ -189,8 +195,8 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
     const root = svgNode("svg", {
       class: "chart-svg",
       width: W,
-      height: H,
-      viewBox: `0 0 ${W} ${H}`,
+      height: chartH,
+      viewBox: `0 0 ${W} ${chartH}`,
     });
 
     // Twilight / night ribbon along the time axis, just below the plot — solid
@@ -256,7 +262,7 @@ export function buildChart(data, model, splits, onHoverIndex = () => {}) {
       root.appendChild(
         svgNode(
           "text",
-          { class: "chart-axis-label", x: xScale(t), y: H - 8, "text-anchor": "middle" },
+          { class: "chart-axis-label", x: xScale(t), y: chartH - 8, "text-anchor": "middle" },
           fmtClock(t),
         ),
       );
